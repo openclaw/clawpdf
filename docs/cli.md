@@ -52,9 +52,12 @@ JSON output uses a stable shape:
 ```bash
 clawpdf render report.pdf --page 1 > page.png
 clawpdf render report.pdf --page 1 -o page.png
+clawpdf render report.pdf --page 1 --inline auto
 ```
 
 Rendering writes PNG bytes to stdout unless `-o, --output` is provided.
+Use `--inline auto|kitty|iterm|none` to render the page in supported terminals
+instead of writing binary PNG bytes to stdout.
 
 ## Common Flags
 
@@ -66,6 +69,7 @@ Rendering writes PNG bytes to stdout unless `-o, --output` is provided.
 - `--forms` and `--no-forms` control form rendering.
 - `--password <value>` or `--password-file <path>` opens encrypted PDFs.
 - `--output-dir <dir>` writes extracted fallback images as `page-N.png`.
+- `--inline auto|kitty|iterm|none` renders extracted or rendered PNGs inline in supported terminals. It is not supported with `--json`.
 
 ## Exit Codes
 

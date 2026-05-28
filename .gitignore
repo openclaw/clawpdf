@@ -3,5 +3,6 @@ dist/
 site/
 .cache/
 coverage/
+.crabbox/
 *.tsbuildinfo
 .DS_Store

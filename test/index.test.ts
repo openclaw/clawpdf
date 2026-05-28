@@ -15,6 +15,8 @@ import {
   extractPdf,
   openPdf,
   releaseExtractEngine,
+  renderInlineImages,
+  resolveInlineImageProtocol,
 } from "../src/index.js";
 import { toDataUrls, toMessageContent } from "../src/adapters/index.js";
 
@@ -237,7 +239,54 @@ describe("clawpdf 0.2 API", () => {
     expect(() => encodePng(new Uint8Array(), { width: 0, height: 1, compress: false })).toThrow(PdfFormatError);
     expect(() => encodePng(new Uint8Array(3), { width: 1, height: 1, compress: false })).toThrow(PdfFormatError);
   });
+
+  it("renders PNGs with inline terminal protocols", async () => {
+    const png = await encodePng(new Uint8Array(8 * 8 * 4).fill(255), { width: 8, height: 8 });
+    const kitty = fakeStdout();
+    expect(resolveInlineImageProtocol({
+      mode: "auto",
+      env: { KITTY_WINDOW_ID: "1" },
+      stdout: kitty,
+    })).toBe("kitty");
+    expect(renderInlineImages({
+      mode: "kitty",
+      env: {},
+      stdout: kitty,
+      images: [{ data: png, name: "page-1.png", label: "Page\u001b]0;bad\u0007 1" }],
+    })).toEqual({ rendered: 1, protocol: "kitty" });
+    expect(kitty.output).toContain("\u001b_G");
+    expect(kitty.output).not.toContain("bad");
+
+    const iterm = fakeStdout();
+    expect(renderInlineImages({
+      mode: "iterm",
+      env: {},
+      stdout: iterm,
+      images: [{ data: png, name: "page-1.png" }],
+    })).toEqual({ rendered: 1, protocol: "iterm" });
+    expect(iterm.output).toContain("\u001b]1337;File=");
+
+    const pipe = fakeStdout(false);
+    expect(renderInlineImages({
+      mode: "auto",
+      env: { KITTY_WINDOW_ID: "1" },
+      stdout: pipe,
+      images: [{ data: png, name: "page-1.png" }],
+    })).toEqual({ rendered: 0, protocol: "none" });
+  });
 });
+
+function fakeStdout(isTTY = true): NodeJS.WritableStream & { output: string; columns: number; isTTY: boolean } {
+  return {
+    output: "",
+    columns: 80,
+    isTTY,
+    write(chunk: string | Uint8Array): boolean {
+      this.output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+      return true;
+    },
+  } as NodeJS.WritableStream & { output: string; columns: number; isTTY: boolean };
+}
 
 function makeTextPdf(text: string | string[], options: { width?: number; height?: number; rotate?: 0 | 90 | 180 | 270 } = {}): Uint8Array {
   const pages = Array.isArray(text) ? text : [text];

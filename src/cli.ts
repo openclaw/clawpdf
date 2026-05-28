@@ -7,6 +7,7 @@ import {
   type ExtractMode,
   type ExtractOptions,
   type ExtractResult,
+  type InlineImageMode,
   type RenderOptions,
   PdfBudgetError,
   PdfError,
@@ -16,6 +17,7 @@ import {
   createEngine,
   extractPdf,
   releaseExtractEngine,
+  renderInlineImages,
 } from "./index.js";
 
 type Command = "extract" | "render";
@@ -45,6 +47,7 @@ type ParsedArgs = {
   maxPixels?: number;
   maxDimension?: number;
   forms?: boolean;
+  inline?: InlineImageMode;
 };
 
 const defaultCliMaxPages = 20;
@@ -92,6 +95,7 @@ Extraction flags:
   --max-text-chars <n>       Maximum text characters
   --min-text-chars <n>       Minimum text before auto image fallback
   --output-dir <dir>         Write extracted PNG images to directory
+  --inline <mode>            Render result images inline: auto, kitty, iterm, none
 
 Render flags:
   --page <n>                 One-based page number
@@ -225,6 +229,9 @@ function parseArgs(argv: string[]): ParsedArgs {
       case "--no-forms":
         parsed.forms = false;
         break;
+      case "--inline":
+        parsed.inline = parseInlineMode(nextValue(args, ++index, arg));
+        break;
       case "-o":
       case "--output":
         parsed.output = nextValue(args, ++index, arg);
@@ -250,6 +257,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
   if (parsed.json && parsed.plain) {
     throw new CliError("Use at most one of --json or --plain", 2);
+  }
+  if (parsed.json && parsed.inline && parsed.inline !== "none") {
+    throw new CliError("--inline is not supported with --json output", 2);
   }
   if (parsed.quiet && parsed.verbose) {
     throw new CliError("Use at most one of --quiet or --verbose", 2);
@@ -289,6 +299,13 @@ function parseMode(value: string): ExtractMode {
     return value;
   }
   throw new CliError(`Unsupported mode: ${value}`, 2);
+}
+
+function parseInlineMode(value: string): InlineImageMode {
+  if (value === "none" || value === "auto" || value === "kitty" || value === "iterm") {
+    return value;
+  }
+  throw new CliError(`Unsupported inline mode: ${value}`, 2);
 }
 
 function parsePages(value: string, limit: number): number[] {
@@ -382,6 +399,22 @@ async function runExtract(input: string | Uint8Array, parsed: ParsedArgs, passwo
   if (parsed.outputDir) {
     await writeImages(parsed.outputDir, result);
   }
+  if (parsed.inline && parsed.inline !== "none" && result.images.length > 0) {
+    const inline = renderInlineImages({
+      mode: parsed.inline,
+      env: process.env,
+      stdout: process.stdout,
+      images: result.images.map((image) => ({
+        data: image.bytes,
+        name: `page-${image.page}.png`,
+        label: `Page ${image.page}`,
+      })),
+    });
+    if (inline.rendered === 0) {
+      const hint = parsed.outputDir ? `Images saved to ${parsed.outputDir}. ` : "";
+      process.stderr.write(`${hint}Inline images unavailable for this terminal.\n`);
+    }
+  }
   if (parsed.json) {
     process.stdout.write(`${JSON.stringify(jsonResult(result), null, 2)}\n`);
     return;
@@ -447,9 +480,27 @@ async function runRender(input: string | Uint8Array, parsed: ParsedArgs, passwor
       const png = await pdf.page(parsed.page ?? 1).png(renderOptions);
       if (parsed.output) {
         await writeFile(parsed.output, png);
+      }
+      if (parsed.inline && parsed.inline !== "none") {
+        const inline = renderInlineImages({
+          mode: parsed.inline,
+          env: process.env,
+          stdout: process.stdout,
+          images: [{
+            data: png,
+            name: `page-${parsed.page ?? 1}.png`,
+            label: `Page ${parsed.page ?? 1}`,
+          }],
+        });
+        if (inline.rendered === 0) {
+          const hint = parsed.output ? `Image saved to ${parsed.output}. ` : "";
+          process.stderr.write(`${hint}Inline images unavailable for this terminal.\n`);
+        }
         return;
       }
-      process.stdout.write(png);
+      if (!parsed.output) {
+        process.stdout.write(png);
+      }
     } finally {
       pdf.destroy();
     }
