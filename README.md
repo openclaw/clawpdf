@@ -153,7 +153,7 @@ Extraction options:
 Local Node benchmark on five sample PDFs, first page rendered at scale `2` with
 text extraction and PNG encoding included.
 
-| Sample | pdf.js total / RSS / PNG | clawpdf total / RSS / PNG |
+| Sample | previous stack total / RSS / PNG | clawpdf total / RSS / PNG |
 | --- | --- | --- |
 | Form | 95.4 ms / 174.9 MB / 114,930 B | 38.7 ms / 129.4 MB / 100,629 B |
 | Hello | 65.2 ms / 159.7 MB / 41,408 B | 27.2 ms / 124.1 MB / 47,106 B |
@@ -196,19 +196,6 @@ To move to a newer `pdfium-lib` release, update the release tag and hashes in:
 - `scripts/download-pdfium.mjs`
 - `src/constants.ts`
 - this README
-
-## Prior Art
-
-- [`@hyzyla/pdfium`](https://github.com/hyzyla/pdfium): friendly TypeScript API
-  around `pdfium-lib`.
-- [`pdfium-lib`](https://github.com/paulocoutinhox/pdfium-lib): PDFium builds
-  for multiple targets, including WASM.
-- [`pdfjs-dist`](https://github.com/mozilla/pdf.js): current OpenClaw PDF parser
-  path before this experiment.
-
-`clawpdf` is narrower than `@hyzyla/pdfium`: no image-object API, no worker
-client, no docs site runtime, no runtime dependencies. The goal is a boring
-OpenClaw-grade extraction/rendering primitive.
 
 ## License
 

@@ -6,6 +6,7 @@
 - Added a maximum rendered image dimension cap for extraction fallback.
 - Added broader PDF extraction, rendering, password, error, PNG, and CI coverage.
 - Added a GitHub Pages documentation site with one `docs/*.md` page per feature.
+- Removed external comparison references from the public README and docs.
 
 ## 0.1.0
 

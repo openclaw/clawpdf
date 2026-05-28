@@ -7,8 +7,8 @@ description: Zero-dependency PDFium WebAssembly bindings for text extraction and
 
 ClawPDF is a small PDFium WebAssembly wrapper for Node and browsers. It loads
 PDF bytes, extracts text, renders pages, and produces PNG fallback images
-without pulling in `pdfjs-dist`, a native canvas package, postinstall scripts, or
-runtime dependencies.
+without pulling in a native canvas package, postinstall scripts, or runtime
+dependencies.
 
 It is built for OpenClaw's fallback PDF path: extract text first, render selected
 pages only when text is too short, and keep image work inside predictable page,
@@ -60,5 +60,5 @@ try {
 - [Browser and Bundlers](browser-bundlers.md) covers `wasmUrl`, `wasmBinary`, and custom instantiation.
 - [PDFium Provenance](pdfium-provenance.md) covers the vendored binary and refresh workflow.
 - [Package Shape](package-shape.md) covers dependencies and published files.
-- [Performance](performance.md) records the current pdf.js comparison snapshot.
+- [Performance](performance.md) records the current comparison snapshot.
 - [API Reference](api-reference.md) lists the exported API surface.
