@@ -1,0 +1,44 @@
+{
+  "name": "clawpdf",
+  "version": "0.1.0",
+  "description": "Zero-dependency PDFium WASM bindings for PDF text extraction and page rendering.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openclaw/clawpdf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/openclaw/clawpdf/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-vendor.mjs",
+    "clean": "rm -rf dist",
+    "download:pdfium": "node scripts/download-pdfium.mjs",
+    "prepack": "pnpm build",
+    "test": "pnpm build && vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.0.14"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.2.2"
+}
