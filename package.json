@@ -27,7 +27,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-vendor.mjs",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist site",
+    "docs:site": "node scripts/build-docs-site.mjs",
     "download:pdfium": "node scripts/download-pdfium.mjs",
     "prepack": "pnpm build",
     "test": "pnpm build && vitest run",

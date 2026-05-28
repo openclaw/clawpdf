@@ -4,6 +4,8 @@
 
 Zero-dependency PDFium WebAssembly bindings for Node and browsers.
 
+Docs: <https://clawpdf.dev/>
+
 `clawpdf` is intentionally small: load a PDF, extract text, render pages to RGBA,
 or encode rendered pages as PNGs. It ships the PDFium WASM binary in the package
 and has no runtime dependencies, native addons, postinstall scripts, or canvas
@@ -81,6 +83,20 @@ This mirrors the OpenClaw fallback flow:
 3. Otherwise render selected pages within a pixel budget and return PNG images.
 
 ## API
+
+Feature docs:
+
+- [Loading PDFs](https://clawpdf.dev/loading.html)
+- [Text extraction](https://clawpdf.dev/text-extraction.html)
+- [Page rendering](https://clawpdf.dev/page-rendering.html)
+- [PNG output](https://clawpdf.dev/png-output.html)
+- [Extraction fallback](https://clawpdf.dev/extraction-fallback.html)
+- [Password-protected PDFs](https://clawpdf.dev/passwords.html)
+- [Browser and bundlers](https://clawpdf.dev/browser-bundlers.html)
+- [PDFium provenance](https://clawpdf.dev/pdfium-provenance.html)
+- [Package shape](https://clawpdf.dev/package-shape.html)
+- [Performance](https://clawpdf.dev/performance.html)
+- [API reference](https://clawpdf.dev/api-reference.html)
 
 ### `loadClawPDF(options?)`
 

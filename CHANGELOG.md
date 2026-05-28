@@ -5,6 +5,7 @@
 - Added password support to the top-level extraction helper.
 - Added a maximum rendered image dimension cap for extraction fallback.
 - Added broader PDF extraction, rendering, password, error, PNG, and CI coverage.
+- Added a GitHub Pages documentation site with one `docs/*.md` page per feature.
 
 ## 0.1.0
 
