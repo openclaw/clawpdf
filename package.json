@@ -27,7 +27,7 @@
     }
   },
   "bin": {
-    "clawpdf": "./dist/cli.js"
+    "clawpdf": "dist/cli.js"
   },
   "files": [
     "dist",
