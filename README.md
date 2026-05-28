@@ -33,6 +33,7 @@ ESM-only. Node 20+ is supported.
 ## Quick Start
 
 ```ts
+import { writeFile } from "node:fs/promises";
 import { openPdf } from "clawpdf";
 
 await using pdf = await openPdf("report.pdf");
@@ -41,22 +42,31 @@ console.log(pdf.pageCount);
 console.log(pdf.text({ maxPages: 5 }));
 
 const png = await pdf.page(1).png({ dpi: 144, forms: true });
-await fs.promises.writeFile("page-1.png", png);
+await writeFile("page-1.png", png);
 ```
 
 All user-facing page numbers are one-based.
 
-Server code should create one engine and reuse it:
+## Reuse an Engine
+
+Server code should create one PDFium engine and reuse it:
 
 ```ts
 import { createEngine } from "clawpdf";
 
 await using engine = await createEngine();
 
-const result = await engine.extract(pdfBytes, {
-  mode: "auto",
-  maxPages: 20,
-});
+await using pdf = await engine.open(pdfBytes);
+
+console.log(pdf.metadata.title);
+console.log(pdf.page(1).text());
+```
+
+Use `engine.extract(...)` when you want the same text-first fallback behavior
+without manually opening and closing a document:
+
+```ts
+const result = await engine.extract(pdfBytes, { mode: "auto", maxPages: 20 });
 ```
 
 ## Text-First Extraction
@@ -84,6 +94,39 @@ console.log(toMessageContent(result)); // transport-shaped blocks
 
 `auto` always extracts text and renders PNG images only when extracted text is
 shorter than `minTextChars`.
+
+## Browser Usage
+
+Use `clawpdf/browser` in bundled browser code. It exports the same API and
+pre-wires the packaged WASM URL.
+
+```ts
+import { openPdf } from "clawpdf/browser";
+
+await using pdf = await openPdf(file);
+console.log(pdf.text({ maxPages: 3 }));
+```
+
+Custom WASM hosting is still available:
+
+```ts
+import { createEngine } from "clawpdf/browser";
+
+await using engine = await createEngine({
+  wasmUrl: "/assets/pdfium.esm.wasm",
+});
+```
+
+## Passwords
+
+```ts
+import { openPdf } from "clawpdf";
+
+await using pdf = await openPdf("secret.pdf", { password: "secret" });
+console.log(pdf.text());
+```
+
+Wrong or missing passwords throw `PdfPasswordError`.
 
 ## API
 

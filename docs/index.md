@@ -25,6 +25,7 @@ ESM-only. Node 20+ is supported.
 ## Quick Example
 
 ```ts
+import { writeFile } from "node:fs/promises";
 import { openPdf } from "clawpdf";
 
 await using pdf = await openPdf("report.pdf");
@@ -33,7 +34,7 @@ console.log(pdf.pageCount);
 console.log(pdf.text({ maxPages: 5 }));
 
 const png = await pdf.page(1).png({ dpi: 144, forms: true });
-await fs.promises.writeFile("page-1.png", png);
+await writeFile("page-1.png", png);
 ```
 
 For server code, keep one `PdfEngine` alive and reuse it. The top-level

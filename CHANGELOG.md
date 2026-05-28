@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Expanded README usage examples and fixed copy-pasteable docs snippets.
 - Restyled the GitHub Pages documentation site with a gogcli-like docs shell, home hero, search, page heroes, and canonical custom-domain URLs.
 
 ## 0.2.0

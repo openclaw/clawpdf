@@ -12,8 +12,10 @@ ClawPDF includes PNG output so Node users do not need a native canvas package.
 `page.png(...)` returns compressed PNG bytes asynchronously:
 
 ```ts
+import { writeFile } from "node:fs/promises";
+
 const png = await pdf.page(1).png({ dpi: 144, forms: true });
-await fs.promises.writeFile("page.png", png);
+await writeFile("page.png", png);
 ```
 
 `page.pngSync(...)` returns PNG bytes synchronously using stored zlib blocks.

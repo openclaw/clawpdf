@@ -54,7 +54,7 @@ is safe. Calling other methods after destroy throws `PdfDestroyedError`.
 Pass a user password when opening:
 
 ```ts
-const pdf = await openPdf("secret.pdf", { password: "secret" });
+await using pdf = await openPdf("secret.pdf", { password: "secret" });
 ```
 
 Wrong or missing passwords throw `PdfPasswordError`.

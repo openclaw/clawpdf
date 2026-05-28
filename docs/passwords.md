@@ -10,7 +10,10 @@ ClawPDF supports encrypted PDFs that PDFium can open with a user password.
 ## Document API
 
 ```ts
-const pdf = await openPdf("secret.pdf", { password: "secret" });
+import { openPdf } from "clawpdf";
+
+await using pdf = await openPdf("secret.pdf", { password: "secret" });
+console.log(pdf.text());
 ```
 
 Wrong or missing passwords throw `PdfPasswordError`.
@@ -18,6 +21,8 @@ Wrong or missing passwords throw `PdfPasswordError`.
 ## Extraction Helper
 
 ```ts
+import { extractPdf } from "clawpdf";
+
 const result = await extractPdf("secret.pdf", {
   password: "secret",
   minTextChars: 200,

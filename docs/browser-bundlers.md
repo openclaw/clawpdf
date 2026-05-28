@@ -11,7 +11,8 @@ Use `clawpdf/browser` in bundled browser code. It exports the same API as
 ```ts
 import { openPdf } from "clawpdf/browser";
 
-const pdf = await openPdf(file);
+await using pdf = await openPdf(file);
+console.log(pdf.text({ maxPages: 3 }));
 ```
 
 Custom resolution stays available:
@@ -19,7 +20,7 @@ Custom resolution stays available:
 ```ts
 import { createEngine } from "clawpdf/browser";
 
-const engine = await createEngine({
+await using engine = await createEngine({
   wasmUrl: "/assets/pdfium.esm.wasm",
 });
 ```
@@ -43,7 +44,7 @@ Pass `instantiateWasm` when a runtime needs a custom WebAssembly instantiation
 path:
 
 ```ts
-const engine = await createEngine({
+await using engine = await createEngine({
   instantiateWasm(imports, receiveInstance) {
     // Runtime-specific instantiation hook.
   },
