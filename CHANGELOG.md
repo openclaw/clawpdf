@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - Added a zero-dependency `clawpdf` CLI for text extraction, JSON output, stdin input, page rendering, and password-protected PDFs.
 - Added inline terminal PNG rendering for CLI image output with Kitty, Ghostty, Konsole, WezTerm, and iTerm-compatible terminals.
