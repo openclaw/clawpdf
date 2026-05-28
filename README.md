@@ -120,6 +120,19 @@ Render options:
 - `renderForms`: render AcroForm widgets.
 - `transparent`: transparent page background.
 
+## Performance Snapshot
+
+Local Node benchmark on five sample PDFs, first page rendered at scale `2` with
+text extraction and PNG encoding included.
+
+| Sample | pdf.js total / RSS / PNG | clawpdf total / RSS / PNG |
+| --- | --- | --- |
+| Form | 95.4 ms / 174.9 MB / 114,930 B | 38.7 ms / 129.4 MB / 100,629 B |
+| Hello | 65.2 ms / 159.7 MB / 41,408 B | 27.2 ms / 124.1 MB / 47,106 B |
+| Scientific | 176.9 ms / 202.0 MB / 608,807 B | 66.0 ms / 137.8 MB / 321,122 B |
+| Magazine | 519.4 ms / 312.0 MB / 1,616,318 B | 255.9 ms / 179.5 MB / 1,930,947 B |
+| Checkmark | 2.6 ms / 128.1 MB / 589 B | 1.1 ms / 83.2 MB / 498 B |
+
 ## Package Shape
 
 Runtime dependencies: none.
