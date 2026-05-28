@@ -1,3 +1,5 @@
+![clawpdf banner](docs/assets/readme-banner.jpg)
+
 # clawpdf
 
 [![CI](https://github.com/openclaw/clawpdf/actions/workflows/ci.yml/badge.svg)](https://github.com/openclaw/clawpdf/actions/workflows/ci.yml)
