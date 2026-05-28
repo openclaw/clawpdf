@@ -44,7 +44,7 @@ try {
     console.log(document.pageCount);
     console.log(document.extractText({ maxPages: 5 }));
 
-    const page = document.renderPagePng(0, { scale: 2, renderForms: true });
+    const page = await document.renderPagePngCompressed(0, { scale: 2, renderForms: true });
     await fs.promises.writeFile("page-1.png", page.png);
   } finally {
     document.destroy();
@@ -105,9 +105,13 @@ Node can load the packaged `dist/vendor/pdfium.wasm` automatically.
 - `getPageText(pageIndex)`: text for one zero-based page.
 - `extractText({ maxPages, pageNumbers })`: text for selected pages.
 - `renderPage(pageIndex, options)`: RGBA bitmap.
-- `renderPagePng(pageIndex, options)`: PNG bytes.
-- `extractContent(options)`: text-first extraction with image fallback.
+- `renderPagePng(pageIndex, options)`: sync PNG bytes with stored zlib blocks.
+- `renderPagePngCompressed(pageIndex, options)`: compressed PNG bytes.
+- `extractContent(options)`: sync text-first extraction with stored-PNG image fallback.
+- `extractContentCompressed(options)`: async text-first extraction with compressed-PNG image fallback.
 - `destroy()`: releases PDF document memory.
+
+The top-level async `extractPdfContent(...)` helper uses compressed PNG output.
 
 Render options:
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodePngRgba, extractPdfContent, loadClawPDF, PDFIUM_RELEASE } from "../src/index.js";
+import { encodePngRgba, encodePngRgbaCompressed, extractPdfContent, loadClawPDF, PDFIUM_RELEASE } from "../src/index.js";
 
 describe("clawpdf", () => {
   it("extracts text from a PDF", async () => {
@@ -31,6 +31,10 @@ describe("clawpdf", () => {
 
         const png = document.renderPagePng(0, { scale: 0.5 });
         expect(Array.from(png.png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+
+        const compressed = await document.renderPagePngCompressed(0, { scale: 0.5 });
+        expect(Array.from(compressed.png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+        expect(compressed.png.byteLength).toBeLessThan(png.png.byteLength);
       } finally {
         document.destroy();
       }
@@ -49,20 +53,43 @@ describe("clawpdf", () => {
     expect(withImage.text).toContain("Short");
     expect(withImage.images).toHaveLength(1);
     expect(withImage.images[0]?.mimeType).toBe("image/png");
+    expect(withImage.images[0]?.data.length).toBeLessThan(20_000);
   });
 
-  it("encodes standalone RGBA PNGs", () => {
+  it("rounds fractional rendered dimensions up", async () => {
+    const library = await loadClawPDF();
+    try {
+      const document = library.loadDocument(makeTextPdf("Small", { width: 16.875, height: 12.75 }));
+      try {
+        const rendered = document.renderPage(0, { scale: 2 });
+        expect(rendered.width).toBe(34);
+        expect(rendered.height).toBe(26);
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
+  });
+
+  it("encodes standalone RGBA PNGs", async () => {
     const png = encodePngRgba(1, 1, Uint8Array.from([255, 0, 0, 255]));
     expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    const compressed = await encodePngRgbaCompressed(8, 8, new Uint8Array(8 * 8 * 4).fill(255));
+    expect(Array.from(compressed.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(compressed.byteLength).toBeLessThan(encodePngRgba(8, 8, new Uint8Array(8 * 8 * 4).fill(255)).byteLength);
   });
 });
 
-function makeTextPdf(text: string): Uint8Array {
+function makeTextPdf(text: string, options: { width?: number; height?: number } = {}): Uint8Array {
   const escaped = text.replace(/[()\\]/g, (char) => `\\${char}`);
+  const width = options.width ?? 612;
+  const height = options.height ?? 792;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>`,
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     stream(`BT /F1 24 Tf 72 720 Td (${escaped}) Tj ET`),
   ];

@@ -2,13 +2,36 @@ const pngSignature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const crcTable = makeCrcTable();
 
 export function encodePngRgba(width: number, height: number, rgba: Uint8Array): Uint8Array {
+  validatePngInput(width, height, rgba);
+
+  return encodePng(width, height, zlibStore(unfilteredRows(width, height, rgba)));
+}
+
+export async function encodePngRgbaCompressed(width: number, height: number, rgba: Uint8Array): Promise<Uint8Array> {
+  validatePngInput(width, height, rgba);
+
+  return encodePng(width, height, await deflate(unfilteredRows(width, height, rgba)));
+}
+
+function validatePngInput(width: number, height: number, rgba: Uint8Array): void {
   if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
     throw new RangeError("PNG dimensions must be positive integers");
   }
   if (rgba.byteLength !== width * height * 4) {
     throw new RangeError(`RGBA buffer has ${rgba.byteLength} bytes; expected ${width * height * 4}`);
   }
+}
 
+function encodePng(width: number, height: number, idat: Uint8Array): Uint8Array {
+  return concat([
+    pngSignature,
+    chunk("IHDR", ihdr(width, height)),
+    chunk("IDAT", idat),
+    chunk("IEND", new Uint8Array()),
+  ]);
+}
+
+function unfilteredRows(width: number, height: number, rgba: Uint8Array): Uint8Array {
   const stride = width * 4;
   const raw = new Uint8Array((stride + 1) * height);
   for (let row = 0; row < height; row += 1) {
@@ -16,13 +39,7 @@ export function encodePngRgba(width: number, height: number, rgba: Uint8Array): 
     raw[rawOffset] = 0;
     raw.set(rgba.subarray(row * stride, (row + 1) * stride), rawOffset + 1);
   }
-
-  return concat([
-    pngSignature,
-    chunk("IHDR", ihdr(width, height)),
-    chunk("IDAT", zlibStore(raw)),
-    chunk("IEND", new Uint8Array()),
-  ]);
+  return raw;
 }
 
 function ihdr(width: number, height: number): Uint8Array {
@@ -52,6 +69,29 @@ function zlibStore(input: Uint8Array): Uint8Array {
   new DataView(trailer.buffer).setUint32(0, adler32(input));
   blocks.push(trailer);
   return concat(blocks);
+}
+
+async function deflate(input: Uint8Array): Promise<Uint8Array> {
+  if (isNode()) {
+    const { deflateSync } = await import("node:zlib");
+    return new Uint8Array(deflateSync(input));
+  }
+  if (typeof CompressionStream === "function") {
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(input);
+        controller.close();
+      },
+    });
+    const compressor = new CompressionStream("deflate") as unknown as ReadableWritablePair<Uint8Array, Uint8Array>;
+    const stream = source.pipeThrough(compressor);
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  return zlibStore(input);
+}
+
+function isNode(): boolean {
+  return typeof process === "object" && Boolean(process.versions?.node);
 }
 
 function chunk(type: string, data: Uint8Array): Uint8Array {

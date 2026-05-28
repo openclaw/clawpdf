@@ -1,8 +1,8 @@
 import loadPdfium, { type LoadPdfiumOptions, type PdfiumModule } from "./vendor/pdfium.esm.js";
 import { BitmapFormat, PdfErrorCode, PDFIUM_RELEASE, PDFIUM_WASM_SHA256, RenderFlag } from "./constants.js";
-import { encodePngRgba } from "./png.js";
+import { encodePngRgba, encodePngRgbaCompressed } from "./png.js";
 
-export { encodePngRgba, PDFIUM_RELEASE, PDFIUM_WASM_SHA256 };
+export { encodePngRgba, encodePngRgbaCompressed, PDFIUM_RELEASE, PDFIUM_WASM_SHA256 };
 
 export type ClawPdfLoadOptions = {
   wasmBinary?: ArrayBuffer;
@@ -89,7 +89,7 @@ export async function extractPdfContent(
   try {
     const document = library.loadDocument(input);
     try {
-      return document.extractContent(options);
+      return document.extractContentCompressed(options);
     } finally {
       document.destroy();
     }
@@ -223,8 +223,8 @@ export class PdfDocument {
       const baseWidth = options.width ?? originalWidth;
       const baseHeight = options.height ?? originalHeight;
       const scale = options.scale ?? 1;
-      const width = Math.max(1, Math.floor(baseWidth * scale));
-      const height = Math.max(1, Math.floor(baseHeight * scale));
+      const width = Math.max(1, Math.ceil(baseWidth * scale));
+      const height = Math.max(1, Math.ceil(baseHeight * scale));
       const byteLength = width * height * 4;
       const bitmapPtr = this.#malloc(byteLength);
       const bitmap = this.module._FPDFBitmap_CreateEx(
@@ -279,6 +279,17 @@ export class PdfDocument {
     };
   }
 
+  async renderPagePngCompressed(pageIndex: number, options: PdfRenderOptions = {}): Promise<PdfPngPage> {
+    const rendered = this.renderPage(pageIndex, options);
+    return {
+      width: rendered.width,
+      height: rendered.height,
+      originalWidth: rendered.originalWidth,
+      originalHeight: rendered.originalHeight,
+      png: await encodePngRgbaCompressed(rendered.width, rendered.height, rendered.rgba),
+    };
+  }
+
   extractContent(options: PdfExtractOptions = {}): PdfExtractResult {
     const maxPages = options.maxPages ?? defaultMaxPages;
     const maxPixels = options.maxPixels ?? defaultMaxPixels;
@@ -297,6 +308,38 @@ export class PdfDocument {
         break;
       }
       const rendered = this.renderPagePng(pageIndex, {
+        scale: plan.scale,
+        renderForms: true,
+      });
+      images.push({
+        type: "image",
+        mimeType: "image/png",
+        data: bytesToBase64(rendered.png),
+        pageNumber: pageIndex + 1,
+      });
+      remainingPixels -= rendered.width * rendered.height;
+    }
+    return { text, images };
+  }
+
+  async extractContentCompressed(options: PdfExtractOptions = {}): Promise<PdfExtractResult> {
+    const maxPages = options.maxPages ?? defaultMaxPages;
+    const maxPixels = options.maxPixels ?? defaultMaxPixels;
+    const minTextChars = options.minTextChars ?? defaultMinTextChars;
+    const pageIndexes = this.#effectivePageIndexes(maxPages, options.pageNumbers);
+    const text = this.extractText({ maxPages, ...(options.pageNumbers ? { pageNumbers: options.pageNumbers } : {}) });
+    if (text.trim().length >= minTextChars) {
+      return { text, images: [] };
+    }
+
+    const images: PdfExtractedImage[] = [];
+    let remainingPixels = Math.max(1, Math.floor(maxPixels));
+    for (const pageIndex of pageIndexes) {
+      const plan = this.#renderPlan(pageIndex, remainingPixels, options.renderScale);
+      if (!plan) {
+        break;
+      }
+      const rendered = await this.renderPagePngCompressed(pageIndex, {
         scale: plan.scale,
         renderForms: true,
       });
