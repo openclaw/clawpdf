@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restyled the GitHub Pages documentation site with a gogcli-like docs shell, home hero, search, page heroes, and canonical custom-domain URLs.
+
 ## 0.2.0
 
 - Redesigned the public API around `createEngine`, `openPdf`, `extractPdf`, one-based pages, typed errors, raw PNG bytes, and opt-in adapters.
