@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added a zero-dependency `clawpdf` CLI for text extraction, JSON output, stdin input, page rendering, and password-protected PDFs.
+- Added inline terminal PNG rendering for CLI image output with Kitty, Ghostty, Konsole, WezTerm, and iTerm-compatible terminals.
 - Added syntax highlighting and polished copy buttons to the documentation site code blocks.
 - Expanded README usage examples and fixed copy-pasteable docs snippets.
 - Restyled the GitHub Pages documentation site with a gogcli-like docs shell, home hero, search, page heroes, and canonical custom-domain URLs.

@@ -6,9 +6,18 @@ import { tmpdir } from "node:os";
 
 const root = process.cwd();
 const temp = mkdtempSync(join(tmpdir(), "clawpdf-cli-e2e-"));
+const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+
+function run(command, args, options = {}) {
+  if (process.platform !== "win32") {
+    return execFileSync(command, args, options);
+  }
+  return execFileSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/c", command, ...args], options);
+}
 
 try {
-  execFileSync("pnpm", ["pack", "--pack-destination", temp], { cwd: root, stdio: "pipe" });
+  run(pnpm, ["pack", "--pack-destination", temp], { cwd: root, stdio: "pipe" });
   const tarball = readdirSync(temp).find((entry) => entry.endsWith(".tgz"));
   if (!tarball) {
     throw new Error("pnpm pack did not produce a tarball");
@@ -16,7 +25,7 @@ try {
 
   const appDir = join(temp, "app");
   mkdirSync(appDir);
-  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(temp, tarball)], {
+  run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(temp, tarball)], {
     cwd: appDir,
     stdio: "pipe",
   });
@@ -25,42 +34,47 @@ try {
   writeFileSync(pdfPath, makeTextPdf("CLI package smoke"));
   const bin = join(appDir, "node_modules", ".bin", process.platform === "win32" ? "clawpdf.cmd" : "clawpdf");
 
-  const text = execFileSync(bin, [pdfPath], { encoding: "utf8" });
+  const text = run(bin, [pdfPath], { encoding: "utf8" });
   assert(text.includes("CLI package smoke"), "text extraction output did not include PDF text");
-  const renderHelp = execFileSync(bin, ["render", "--help"], { encoding: "utf8" });
+  const renderHelp = run(bin, ["render", "--help"], { encoding: "utf8" });
   assert(renderHelp.includes("clawpdf render"), "render help did not print command help");
+  assertFails(
+    () => run(bin, [pdfPath, "--json", "--inline", "auto"], { encoding: "utf8", stdio: "pipe" }),
+    2,
+    "inline JSON conflict did not fail as invalid usage",
+  );
 
-  const json = JSON.parse(execFileSync(bin, [pdfPath, "--json"], { encoding: "utf8" }));
+  const json = JSON.parse(run(bin, [pdfPath, "--json"], { encoding: "utf8" }));
   assert(json.text.includes("CLI package smoke"), "JSON output did not include PDF text");
 
-  const cappedRange = execFileSync(bin, [pdfPath, "--pages", "1-1000000000", "--max-pages", "1"], { encoding: "utf8" });
+  const cappedRange = run(bin, [pdfPath, "--pages", "1-1000000000", "--max-pages", "1"], { encoding: "utf8" });
   assert(cappedRange.includes("CLI package smoke"), "page range cap extraction failed");
   assertFails(
-    () => execFileSync(bin, [pdfPath, "--pages", "1-1000000000", "--max-pages", "100001"], { encoding: "utf8", stdio: "pipe" }),
+    () => run(bin, [pdfPath, "--pages", "1-1000000000", "--max-pages", "100001"], { encoding: "utf8", stdio: "pipe" }),
     2,
     "oversized page range did not fail as invalid usage",
   );
 
-  const imageJson = JSON.parse(execFileSync(bin, [pdfPath, "--mode", "images", "--json"], { encoding: "utf8" }));
+  const imageJson = JSON.parse(run(bin, [pdfPath, "--mode", "images", "--json"], { encoding: "utf8" }));
   assert(imageJson.images[0]?.base64, "JSON image output did not include base64 PNG data");
 
   const imageDir = join(temp, "images");
-  execFileSync(bin, [pdfPath, "--mode", "images", "--output-dir", imageDir], { encoding: "utf8" });
+  run(bin, [pdfPath, "--mode", "images", "--output-dir", imageDir], { encoding: "utf8" });
   assert(readFileSync(join(imageDir, "page-1.png")).subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), "output-dir PNG is invalid");
 
-  const png = execFileSync(bin, ["render", pdfPath, "--page", "1"]);
+  const png = run(bin, ["render", pdfPath, "--page", "1"]);
   assert(png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), "render output is not a PNG");
 
   const passwordPdfPath = join(temp, "secret.pdf");
   writeFileSync(passwordPdfPath, passwordProtectedPdf());
-  const secret = execFileSync(bin, [passwordPdfPath, "--password", "secret"], { encoding: "utf8" });
+  const secret = run(bin, [passwordPdfPath, "--password", "secret"], { encoding: "utf8" });
   assert(secret.includes("Secret ClawPDF"), "password-protected extraction failed");
   const passwordPath = join(temp, "password.txt");
   writeFileSync(passwordPath, "secret\n");
-  const secretFromFile = execFileSync(bin, [passwordPdfPath, "--password-file", passwordPath], { encoding: "utf8" });
+  const secretFromFile = run(bin, [passwordPdfPath, "--password-file", passwordPath], { encoding: "utf8" });
   assert(secretFromFile.includes("Secret ClawPDF"), "password-file extraction failed");
 
-  const stdinText = execFileSync(bin, ["-"], { input: readFileSync(pdfPath), encoding: "utf8" });
+  const stdinText = run(bin, ["-"], { input: readFileSync(pdfPath), encoding: "utf8" });
   assert(stdinText.includes("CLI package smoke"), "stdin extraction failed");
 } finally {
   rmSync(temp, { recursive: true, force: true });

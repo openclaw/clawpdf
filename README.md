@@ -58,6 +58,7 @@ clawpdf report.pdf
 cat report.pdf | clawpdf -
 clawpdf report.pdf --json
 clawpdf render report.pdf --page 1 > page.png
+clawpdf render report.pdf --page 1 --inline auto
 ```
 
 Use `--password` or `--password-file` for encrypted PDFs. See the

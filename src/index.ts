@@ -19,6 +19,8 @@ export type { PdfInput } from "./input.js";
 export type { PdfMetadata } from "./document.js";
 export type { PdfPage } from "./page.js";
 export type { RenderOptions } from "./render.js";
+export type { InlineImageMode, InlineImageProtocol, InlineImage } from "./inline.js";
+export { renderInlineImages, resolveInlineImageProtocol } from "./inline.js";
 
 export type EncodePngOptions = {
   width: number;
