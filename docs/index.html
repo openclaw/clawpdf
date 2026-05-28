@@ -224,12 +224,12 @@
           <pre><code>import { loadClawPDF } from "clawpdf";
 
 const library = await loadClawPDF();
-const document = library.loadDocument(pdfBytes);
+const document = library.loadDocument(pdfBytes, password);
 
 console.log(document.pageCount);
 console.log(document.extractText({ maxPages: 5 }));
 
-const page = document.renderPagePng(0, {
+const page = await document.renderPagePngCompressed(0, {
   scale: 2,
   renderForms: true,
 });</code></pre>
@@ -240,15 +240,15 @@ const page = document.renderPagePng(0, {
         <article class="tile">
           <h2>Text first</h2>
           <p>
-            Extract selectable PDF text before falling back to rendered pages for
-            model input.
+            Extract selectable PDF text before falling back to rendered pages
+            within a pixel and dimension budget.
           </p>
         </article>
         <article class="tile">
           <h2>Renderable</h2>
           <p>
             Render pages to RGBA or PNG with predictable sizing, scale, and form
-            handling.
+            handling, including password-protected documents.
           </p>
         </article>
         <article class="tile">

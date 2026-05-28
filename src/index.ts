@@ -32,9 +32,11 @@ export type PdfPngPage = Omit<PdfRenderedPage, "rgba"> & {
 
 export type PdfExtractOptions = {
   maxPages?: number;
+  maxDimension?: number;
   maxPixels?: number;
   minTextChars?: number;
   pageNumbers?: number[];
+  password?: string;
   renderScale?: number;
 };
 
@@ -54,6 +56,7 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf-16le");
 const maxExtractedTextChars = 200_000;
 const defaultMaxPages = 20;
+const defaultMaxDimension = 10_000;
 const defaultMaxPixels = 4_000_000;
 const defaultMinTextChars = 200;
 
@@ -87,9 +90,9 @@ export async function extractPdfContent(
 ): Promise<PdfExtractResult> {
   const library = await loadClawPDF();
   try {
-    const document = library.loadDocument(input);
+    const document = library.loadDocument(input, options.password);
     try {
-      return document.extractContentCompressed(options);
+      return await document.extractContentCompressed(options);
     } finally {
       document.destroy();
     }
@@ -292,6 +295,7 @@ export class PdfDocument {
 
   extractContent(options: PdfExtractOptions = {}): PdfExtractResult {
     const maxPages = options.maxPages ?? defaultMaxPages;
+    const maxDimension = options.maxDimension ?? defaultMaxDimension;
     const maxPixels = options.maxPixels ?? defaultMaxPixels;
     const minTextChars = options.minTextChars ?? defaultMinTextChars;
     const pageIndexes = this.#effectivePageIndexes(maxPages, options.pageNumbers);
@@ -303,7 +307,7 @@ export class PdfDocument {
     const images: PdfExtractedImage[] = [];
     let remainingPixels = Math.max(1, Math.floor(maxPixels));
     for (const pageIndex of pageIndexes) {
-      const plan = this.#renderPlan(pageIndex, remainingPixels, options.renderScale);
+      const plan = this.#renderPlan(pageIndex, remainingPixels, maxDimension, options.renderScale);
       if (!plan) {
         break;
       }
@@ -324,6 +328,7 @@ export class PdfDocument {
 
   async extractContentCompressed(options: PdfExtractOptions = {}): Promise<PdfExtractResult> {
     const maxPages = options.maxPages ?? defaultMaxPages;
+    const maxDimension = options.maxDimension ?? defaultMaxDimension;
     const maxPixels = options.maxPixels ?? defaultMaxPixels;
     const minTextChars = options.minTextChars ?? defaultMinTextChars;
     const pageIndexes = this.#effectivePageIndexes(maxPages, options.pageNumbers);
@@ -335,7 +340,7 @@ export class PdfDocument {
     const images: PdfExtractedImage[] = [];
     let remainingPixels = Math.max(1, Math.floor(maxPixels));
     for (const pageIndex of pageIndexes) {
-      const plan = this.#renderPlan(pageIndex, remainingPixels, options.renderScale);
+      const plan = this.#renderPlan(pageIndex, remainingPixels, maxDimension, options.renderScale);
       if (!plan) {
         break;
       }
@@ -383,16 +388,48 @@ export class PdfDocument {
     return Array.from({ length: Math.min(count, maxPages) }, (_, i) => i);
   }
 
-  #renderPlan(pageIndex: number, remainingPixels: number, preferredScale?: number): { scale: number } | null {
+  #renderPlan(
+    pageIndex: number,
+    remainingPixels: number,
+    maxDimension: number,
+    preferredScale?: number,
+  ): { scale: number } | null {
     return withPage(this.module, this.documentHandle, this.#checkPageIndex(pageIndex), (page) => {
       const width = this.module._FPDF_GetPageWidth(page);
       const height = this.module._FPDF_GetPageHeight(page);
-      if (remainingPixels <= 0 || width <= 0 || height <= 0) {
+      const dimensionLimit = Math.max(1, Math.floor(maxDimension));
+      if (remainingPixels <= 0 || dimensionLimit <= 0 || width <= 0 || height <= 0) {
         return null;
       }
-      const maxScale = Math.sqrt(remainingPixels / Math.max(1, width * height));
-      const scale = Math.min(preferredScale ?? 1, maxScale);
-      return Number.isFinite(scale) && scale > 0 ? { scale } : null;
+      const maxScale = Math.min(
+        preferredScale ?? 1,
+        Math.sqrt(remainingPixels / Math.max(1, width * height)),
+        dimensionLimit / width,
+        dimensionLimit / height,
+      );
+      if (!Number.isFinite(maxScale) || maxScale <= 0) {
+        return null;
+      }
+
+      let best: { scale: number } | null = null;
+      let low = 0;
+      let high = maxScale;
+      for (let i = 0; i < 32; i += 1) {
+        const scale = (low + high) / 2;
+        const renderedWidth = Math.max(1, Math.ceil(width * scale));
+        const renderedHeight = Math.max(1, Math.ceil(height * scale));
+        if (
+          renderedWidth <= dimensionLimit &&
+          renderedHeight <= dimensionLimit &&
+          renderedWidth * renderedHeight <= remainingPixels
+        ) {
+          best = { scale };
+          low = scale;
+        } else {
+          high = scale;
+        }
+      }
+      return best;
     });
   }
 

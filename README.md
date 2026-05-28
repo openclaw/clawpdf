@@ -64,8 +64,10 @@ import { extractPdfContent } from "clawpdf";
 
 const result = await extractPdfContent(pdfBytes, {
   maxPages: 20,
+  maxDimension: 10_000,
   maxPixels: 4_000_000,
   minTextChars: 200,
+  password: "optional user password",
 });
 
 console.log(result.text);
@@ -120,6 +122,16 @@ Render options:
 - `renderForms`: render AcroForm widgets.
 - `transparent`: transparent page background.
 
+Extraction options:
+
+- `maxPages`: maximum pages to inspect, default `20`.
+- `maxDimension`: maximum rendered PNG width or height, default `10,000`.
+- `maxPixels`: total rendered image pixel budget, default `4,000,000`.
+- `minTextChars`: text length threshold before image fallback, default `200`.
+- `pageNumbers`: one-based pages to inspect.
+- `password`: optional PDF user password.
+- `renderScale`: preferred fallback render scale, default `1`.
+
 ## Performance Snapshot
 
 Local Node benchmark on five sample PDFs, first page rendered at scale `2` with
@@ -136,6 +148,7 @@ text extraction and PNG encoding included.
 ## Package Shape
 
 Runtime dependencies: none.
+Release history: see `CHANGELOG.md`.
 
 Published files:
 
@@ -143,6 +156,7 @@ Published files:
 - `dist/index.d.ts`
 - `dist/vendor/pdfium.esm.js`
 - `dist/vendor/pdfium.esm.wasm`
+- `CHANGELOG.md`
 - license/readme/notices
 
 Current vendored binary:

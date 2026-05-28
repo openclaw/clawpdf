@@ -19,6 +19,27 @@ describe("clawpdf", () => {
     }
   });
 
+  it("extracts selected pages within maxPages", async () => {
+    const library = await loadClawPDF();
+    try {
+      const document = library.loadDocument(makeTextPdf(["First page", "Second page", "Third page"]));
+      try {
+        expect(document.extractText({ maxPages: 2 })).toContain("First page");
+        expect(document.extractText({ maxPages: 2 })).toContain("Second page");
+        expect(document.extractText({ maxPages: 2 })).not.toContain("Third page");
+
+        const selected = document.extractText({ maxPages: 2, pageNumbers: [3, 99, 1] });
+        expect(selected).toContain("Third page");
+        expect(selected).toContain("First page");
+        expect(selected).not.toContain("Second page");
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
+  });
+
   it("renders pages to RGBA and PNG", async () => {
     const library = await loadClawPDF();
     try {
@@ -43,6 +64,21 @@ describe("clawpdf", () => {
     }
   });
 
+  it("supports transparent page rendering", async () => {
+    const library = await loadClawPDF();
+    try {
+      const document = library.loadDocument(makeTextPdf(""));
+      try {
+        const rendered = document.renderPage(0, { width: 4, height: 4, transparent: true });
+        expect(rendered.rgba[3]).toBe(0);
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
+  });
+
   it("supports OpenClaw-style text-first extraction fallback", async () => {
     const pdf = makeTextPdf("Short");
     const textOnly = await extractPdfContent(pdf, { minTextChars: 1, maxPages: 1 });
@@ -54,6 +90,82 @@ describe("clawpdf", () => {
     expect(withImage.images).toHaveLength(1);
     expect(withImage.images[0]?.mimeType).toBe("image/png");
     expect(withImage.images[0]?.data.length).toBeLessThan(20_000);
+  });
+
+  it("keeps fallback render images inside maxPixels and maxDimension", async () => {
+    const pdf = makeTextPdf("", { width: 1000, height: 200 });
+    const byPixels = await extractPdfContent(pdf, { minTextChars: 1, maxPages: 1, maxPixels: 100 });
+    expect(byPixels.images).toHaveLength(1);
+    expect(pngDimensions(byPixels.images[0]!.data)).toEqual({ width: 20, height: 4 });
+
+    const byDimension = await extractPdfContent(pdf, {
+      minTextChars: 1,
+      maxPages: 1,
+      maxPixels: 1_000_000,
+      maxDimension: 50,
+    });
+    expect(byDimension.images).toHaveLength(1);
+    const dimensions = pngDimensions(byDimension.images[0]!.data);
+    expect(dimensions.width).toBeLessThanOrEqual(50);
+    expect(dimensions.height).toBeLessThanOrEqual(50);
+    expect(dimensions).toEqual({ width: 50, height: 10 });
+  });
+
+  it("tracks image page numbers and consumes the pixel budget across pages", async () => {
+    const pdf = makeTextPdf(["", "", ""], { width: 100, height: 100 });
+    const result = await extractPdfContent(pdf, {
+      minTextChars: 1,
+      maxPages: 3,
+      maxPixels: 200,
+      maxDimension: 10,
+      pageNumbers: [2, 3, 1],
+    });
+    expect(result.images.map((image) => image.pageNumber)).toEqual([2, 3]);
+    expect(result.images.map((image) => pngDimensions(image.data))).toEqual([
+      { width: 10, height: 10 },
+      { width: 10, height: 10 },
+    ]);
+  });
+
+  it("supports password-protected PDFs through document and helper APIs", async () => {
+    const pdf = passwordProtectedPdf();
+    const library = await loadClawPDF();
+    try {
+      expect(() => library.loadDocument(pdf)).toThrow("PDF password is required or incorrect");
+      expect(() => library.loadDocument(pdf, "wrong")).toThrow("PDF password is required or incorrect");
+      const document = library.loadDocument(pdf, "secret");
+      try {
+        expect(document.getPageText(0)).toContain("Secret ClawPDF");
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
+
+    const extracted = await extractPdfContent(pdf, { password: "secret", minTextChars: 1 });
+    expect(extracted.text).toContain("Secret ClawPDF");
+    await expect(extractPdfContent(pdf, { password: "wrong" })).rejects.toThrow(
+      "PDF password is required or incorrect",
+    );
+  });
+
+  it("reports invalid PDFs and out-of-range page indexes", async () => {
+    await expect(extractPdfContent(new TextEncoder().encode("not a pdf"))).rejects.toThrow(
+      "Input is not a valid PDF or is corrupted",
+    );
+
+    const library = await loadClawPDF();
+    try {
+      const document = library.loadDocument(makeTextPdf("Page"));
+      try {
+        expect(() => document.getPageText(1)).toThrow("Page index 1 is outside 0..0");
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
   });
 
   it("rounds fractional rendered dimensions up", async () => {
@@ -79,20 +191,34 @@ describe("clawpdf", () => {
     const compressed = await encodePngRgbaCompressed(8, 8, new Uint8Array(8 * 8 * 4).fill(255));
     expect(Array.from(compressed.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     expect(compressed.byteLength).toBeLessThan(encodePngRgba(8, 8, new Uint8Array(8 * 8 * 4).fill(255)).byteLength);
+
+    expect(() => encodePngRgba(0, 1, new Uint8Array())).toThrow("PNG dimensions must be positive integers");
+    expect(() => encodePngRgba(1, 1, new Uint8Array(3))).toThrow("RGBA buffer has 3 bytes; expected 4");
   });
 });
 
-function makeTextPdf(text: string, options: { width?: number; height?: number } = {}): Uint8Array {
-  const escaped = text.replace(/[()\\]/g, (char) => `\\${char}`);
+function makeTextPdf(text: string | string[], options: { width?: number; height?: number } = {}): Uint8Array {
+  const pages = Array.isArray(text) ? text : [text];
   const width = options.width ?? 612;
   const height = options.height ?? 792;
-  const objects = [
+  const pageObjects: number[] = [];
+  const objects: string[] = [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>`,
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    stream(`BT /F1 24 Tf 72 720 Td (${escaped}) Tj ET`),
   ];
+  let nextObject = 4;
+  for (const pageText of pages) {
+    const escaped = pageText.replace(/[()\\]/g, (char) => `\\${char}`);
+    const pageObject = nextObject;
+    const contentObject = nextObject + 1;
+    nextObject += 2;
+    pageObjects.push(pageObject);
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObject} 0 R >>`,
+      stream(pageText ? `BT /F1 24 Tf 72 ${Math.max(1, height - 72)} Td (${escaped}) Tj ET` : ""),
+    );
+  }
+  objects.splice(1, 0, `<< /Type /Pages /Kids [${pageObjects.map((object) => `${object} 0 R`).join(" ")}] /Count ${pages.length} >>`);
   let body = "%PDF-1.4\n";
   const offsets = [0];
   for (let i = 0; i < objects.length; i += 1) {
@@ -112,4 +238,35 @@ function makeTextPdf(text: string, options: { width?: number; height?: number } 
 
 function stream(content: string): string {
   return `<< /Length ${Buffer.byteLength(content, "utf8")} >>\nstream\n${content}\nendstream`;
+}
+
+function pngDimensions(base64: string): { width: number; height: number } {
+  const png = Buffer.from(base64, "base64");
+  return {
+    width: png.readUInt32BE(16),
+    height: png.readUInt32BE(20),
+  };
+}
+
+function passwordProtectedPdf(): Uint8Array {
+  return Buffer.from(
+    [
+      "JVBERi0xLjYKJb/3ov4KMSAwIG9iago8PCAvUGFnZXMgMiAwIFIgL1R5cGUgL0NhdGFsb2cgPj4KZW5kb2JqCjIgMCBvYmoKPDwg",
+      "L0NvdW50IDEgL0tpZHMgWyAzIDAgUiBdIC9UeXBlIC9QYWdlcyA+PgplbmRvYmoKMyAwIG9iago8PCAvQ29udGVudHMgNCAwIFIg",
+      "L01lZGlhQm94IFsgMCAwIDYxMiA3OTIgXSAvUGFyZW50IDIgMCBSIC9SZXNvdXJjZXMgPDwgL0ZvbnQgPDwgL0YxIDUgMCBSID4+",
+      "ID4+IC9UeXBlIC9QYWdlID4+CmVuZG9iago0IDAgb2JqCjw8IC9MZW5ndGggODAgL0ZpbHRlciAvRmxhdGVEZWNvZGUgPj4Kc3Ry",
+      "ZWFtCpLU7hcttTGHpV7gzFP386qPY6/p7f+uXflkSdyJs3lR7F5OYPO+YiV7IiZ19QY1ltYpn2Yd5iiWq/ZE8Tu8gtbLyrRf50TK",
+      "VJzj6GfDW5aMCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvQmFzZUZvbnQgL0hlbHZldGljYSAvU3VidHlwZSAvVHlwZTEg",
+      "L1R5cGUgL0ZvbnQgPj4KZW5kb2JqCjYgMCBvYmoKPDwgL0NGIDw8IC9TdGRDRiA8PCAvQXV0aEV2ZW50IC9Eb2NPcGVuIC9DRk0g",
+      "L0FFU1YyIC9MZW5ndGggMTYgPj4gPj4gL0ZpbHRlciAvU3RhbmRhcmQgL0xlbmd0aCAxMjggL08gPDZlZjM3NjRhZDI2Y2ZlM2Nh",
+      "YjY4NzA2ZmMyNmM5NDEzZDgwZDQ3YjA1MzM3NDUyOWEzMmUxNDA1ZWViYTQyYzE+IC9PRSA8PiAvUCAtMTAyOCAvUiA0IC9TdG1G",
+      "IC9TdGRDRiAvU3RyRiAvU3RkQ0YgL1UgPGM0OWM5YmU2ODMyNDRhNTk5YTg2ZjE2NmFiNTk5NDkyMDAyMTQ0Njk5MGI5ZTQxMTQw",
+      "NzFhNGQ5MTA0OTg0YzE+IC9VRSA8PiAvViA0ID4+CmVuZG9iagp4cmVmCjAgNwowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAw",
+      "MTUgMDAwMDAgbiAKMDAwMDAwMDA2NCAwMDAwMCBuIAowMDAwMDAwMTIzIDAwMDAwIG4gCjAwMDAwMDAyNTEgMDAwMDAgbiAKMDAw",
+      "MDAwMDQwMiAwMDAwMCBuIAowMDAwMDAwNDcyIDAwMDAwIG4gCnRyYWlsZXIgPDwgL1Jvb3QgMSAwIFIgL1NpemUgNyAvSUQgWzw1",
+      "M2I5YmY2YmY0MzZmOTJiMjdiYWI0NTU0ZGJiMjkxMj48NTNiOWJmNmJmNDM2ZjkyYjI3YmFiNDU1NGRiYjI5MTI+XSAvRW5jcnlw",
+      "dCA2IDAgUiA+PgpzdGFydHhyZWYKNzg4CiUlRU9GCg==",
+    ].join(""),
+    "base64",
+  );
 }
