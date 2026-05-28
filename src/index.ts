@@ -59,6 +59,8 @@ const defaultMaxPages = 20;
 const defaultMaxDimension = 10_000;
 const defaultMaxPixels = 4_000_000;
 const defaultMinTextChars = 200;
+const maxRenderPixels = 100_000_000;
+const formFillInfoBytes = 1024;
 
 export async function loadClawPDF(options: ClawPdfLoadOptions = {}): Promise<ClawPDF> {
   const loadOptions: LoadPdfiumOptions = {};
@@ -223,11 +225,15 @@ export class PdfDocument {
     return withPage(this.module, this.documentHandle, this.#checkPageIndex(pageIndex), (page) => {
       const originalWidth = this.module._FPDF_GetPageWidth(page);
       const originalHeight = this.module._FPDF_GetPageHeight(page);
-      const baseWidth = options.width ?? originalWidth;
-      const baseHeight = options.height ?? originalHeight;
-      const scale = options.scale ?? 1;
+      const baseWidth = positiveFiniteNumber("width", options.width ?? originalWidth);
+      const baseHeight = positiveFiniteNumber("height", options.height ?? originalHeight);
+      const scale = positiveFiniteNumber("scale", options.scale ?? 1);
       const width = Math.max(1, Math.ceil(baseWidth * scale));
       const height = Math.max(1, Math.ceil(baseHeight * scale));
+      const pixels = width * height;
+      if (!Number.isSafeInteger(pixels) || pixels > maxRenderPixels) {
+        throw new RangeError(`Rendered page has ${pixels} pixels; limit is ${maxRenderPixels}`);
+      }
       const byteLength = width * height * 4;
       const bitmapPtr = this.#malloc(byteLength);
       const bitmap = this.module._FPDFBitmap_CreateEx(
@@ -294,20 +300,20 @@ export class PdfDocument {
   }
 
   extractContent(options: PdfExtractOptions = {}): PdfExtractResult {
-    const maxPages = options.maxPages ?? defaultMaxPages;
-    const maxDimension = options.maxDimension ?? defaultMaxDimension;
-    const maxPixels = options.maxPixels ?? defaultMaxPixels;
-    const minTextChars = options.minTextChars ?? defaultMinTextChars;
-    const pageIndexes = this.#effectivePageIndexes(maxPages, options.pageNumbers);
-    const text = this.extractText({ maxPages, ...(options.pageNumbers ? { pageNumbers: options.pageNumbers } : {}) });
-    if (text.trim().length >= minTextChars) {
+    const normalized = normalizeExtractOptions(options);
+    const pageIndexes = this.#effectivePageIndexes(normalized.maxPages, options.pageNumbers);
+    const text = this.extractText({
+      ...(normalized.maxPages === undefined ? {} : { maxPages: normalized.maxPages }),
+      ...(options.pageNumbers ? { pageNumbers: options.pageNumbers } : {}),
+    });
+    if (text.trim().length >= normalized.minTextChars) {
       return { text, images: [] };
     }
 
     const images: PdfExtractedImage[] = [];
-    let remainingPixels = Math.max(1, Math.floor(maxPixels));
+    let remainingPixels = normalized.maxPixels;
     for (const pageIndex of pageIndexes) {
-      const plan = this.#renderPlan(pageIndex, remainingPixels, maxDimension, options.renderScale);
+      const plan = this.#renderPlan(pageIndex, remainingPixels, normalized.maxDimension, normalized.renderScale);
       if (!plan) {
         break;
       }
@@ -327,20 +333,20 @@ export class PdfDocument {
   }
 
   async extractContentCompressed(options: PdfExtractOptions = {}): Promise<PdfExtractResult> {
-    const maxPages = options.maxPages ?? defaultMaxPages;
-    const maxDimension = options.maxDimension ?? defaultMaxDimension;
-    const maxPixels = options.maxPixels ?? defaultMaxPixels;
-    const minTextChars = options.minTextChars ?? defaultMinTextChars;
-    const pageIndexes = this.#effectivePageIndexes(maxPages, options.pageNumbers);
-    const text = this.extractText({ maxPages, ...(options.pageNumbers ? { pageNumbers: options.pageNumbers } : {}) });
-    if (text.trim().length >= minTextChars) {
+    const normalized = normalizeExtractOptions(options);
+    const pageIndexes = this.#effectivePageIndexes(normalized.maxPages, options.pageNumbers);
+    const text = this.extractText({
+      ...(normalized.maxPages === undefined ? {} : { maxPages: normalized.maxPages }),
+      ...(options.pageNumbers ? { pageNumbers: options.pageNumbers } : {}),
+    });
+    if (text.trim().length >= normalized.minTextChars) {
       return { text, images: [] };
     }
 
     const images: PdfExtractedImage[] = [];
-    let remainingPixels = Math.max(1, Math.floor(maxPixels));
+    let remainingPixels = normalized.maxPixels;
     for (const pageIndex of pageIndexes) {
-      const plan = this.#renderPlan(pageIndex, remainingPixels, maxDimension, options.renderScale);
+      const plan = this.#renderPlan(pageIndex, remainingPixels, normalized.maxDimension, normalized.renderScale);
       if (!plan) {
         break;
       }
@@ -376,16 +382,19 @@ export class PdfDocument {
     this.#destroyed = true;
   }
 
-  #effectivePageIndexes(maxPages = defaultMaxPages, pageNumbers?: number[]): number[] {
+  #effectivePageIndexes(maxPages?: number, pageNumbers?: number[]): number[] {
     this.#assertLive();
     const count = this.pageCount;
+    const pageLimit = maxPages === undefined
+      ? (pageNumbers ? pageNumbers.length : defaultMaxPages)
+      : positiveInteger("maxPages", maxPages);
     if (pageNumbers) {
       return pageNumbers
         .filter((pageNumber) => Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= count)
-        .slice(0, maxPages)
+        .slice(0, pageLimit)
         .map((pageNumber) => pageNumber - 1);
     }
-    return Array.from({ length: Math.min(count, maxPages) }, (_, i) => i);
+    return Array.from({ length: Math.min(count, pageLimit) }, (_, i) => i);
   }
 
   #renderPlan(
@@ -397,7 +406,7 @@ export class PdfDocument {
     return withPage(this.module, this.documentHandle, this.#checkPageIndex(pageIndex), (page) => {
       const width = this.module._FPDF_GetPageWidth(page);
       const height = this.module._FPDF_GetPageHeight(page);
-      const dimensionLimit = Math.max(1, Math.floor(maxDimension));
+      const dimensionLimit = positiveInteger("maxDimension", maxDimension);
       if (remainingPixels <= 0 || dimensionLimit <= 0 || width <= 0 || height <= 0) {
         return null;
       }
@@ -437,8 +446,10 @@ export class PdfDocument {
     if (this.#formHandle) {
       return this.#formHandle;
     }
-    this.#formPtr = this.#malloc(256);
-    this.module.HEAPU8.fill(0, this.#formPtr, this.#formPtr + 256);
+    // PDFium reads the versioned FPDF_FORMFILLINFO struct by field offset.
+    // Keep this padded when refreshing PDFium so v2 callback slots stay in-bounds.
+    this.#formPtr = this.#malloc(formFillInfoBytes);
+    this.module.HEAPU8.fill(0, this.#formPtr, this.#formPtr + formFillInfoBytes);
     new DataView(this.module.HEAPU8.buffer).setUint32(this.#formPtr, 2, true);
     this.#formHandle = this.module._FPDFDOC_InitFormFillEnvironment(this.documentHandle, this.#formPtr);
     if (!this.#formHandle) {
@@ -506,6 +517,47 @@ function pdfLoadErrorMessage(code: number): string {
     default:
       return `PDFium load failed with error ${code}`;
   }
+}
+
+type NormalizedExtractOptions = {
+  maxPages?: number;
+  maxDimension: number;
+  maxPixels: number;
+  minTextChars: number;
+  renderScale?: number;
+};
+
+function normalizeExtractOptions(options: PdfExtractOptions): NormalizedExtractOptions {
+  const normalized: NormalizedExtractOptions = {
+    maxDimension: positiveInteger("maxDimension", options.maxDimension ?? defaultMaxDimension),
+    maxPixels: positiveInteger("maxPixels", options.maxPixels ?? defaultMaxPixels),
+    minTextChars: nonNegativeInteger("minTextChars", options.minTextChars ?? defaultMinTextChars),
+  };
+  if (options.maxPages !== undefined) {
+    normalized.maxPages = positiveInteger("maxPages", options.maxPages);
+  }
+  if (options.renderScale !== undefined) {
+    normalized.renderScale = positiveFiniteNumber("renderScale", options.renderScale);
+  }
+  return normalized;
+}
+
+function positiveInteger(name: string, value: number): number {
+  return Math.max(1, Math.floor(positiveFiniteNumber(name, value)));
+}
+
+function nonNegativeInteger(name: string, value: number): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`${name} must be a finite non-negative number`);
+  }
+  return Math.floor(value);
+}
+
+function positiveFiniteNumber(name: string, value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} must be a finite positive number`);
+  }
+  return value;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

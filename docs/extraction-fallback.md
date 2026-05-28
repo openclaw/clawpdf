@@ -28,13 +28,13 @@ Flow:
 
 ## Options
 
-- `maxPages`: maximum pages to inspect, default `20`.
-- `maxDimension`: maximum rendered PNG width or height, default `10,000`.
-- `maxPixels`: total rendered image pixel budget, default `4,000,000`.
+- `maxPages`: finite positive maximum pages to inspect, default `20` unless `pageNumbers` is provided.
+- `maxDimension`: finite positive maximum rendered PNG width or height, default `10,000`.
+- `maxPixels`: finite positive total rendered image pixel budget, default `4,000,000`.
 - `minTextChars`: text threshold before image fallback, default `200`.
-- `pageNumbers`: one-based pages to inspect.
+- `pageNumbers`: one-based pages to inspect; an explicit list is not capped by the default `maxPages`.
 - `password`: optional PDF user password.
-- `renderScale`: preferred fallback render scale, default `1`.
+- `renderScale`: finite positive preferred fallback render scale, default `1`.
 
 ## Result
 

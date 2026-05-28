@@ -133,20 +133,22 @@ The top-level async `extractPdfContent(...)` helper uses compressed PNG output.
 
 Render options:
 
-- `scale`: multiplier, default `1`.
-- `width` / `height`: point-size override before scaling.
+- `scale`: finite positive multiplier, default `1`.
+- `width` / `height`: finite positive point-size override before scaling.
 - `renderForms`: render AcroForm widgets.
 - `transparent`: transparent page background.
 
+Rendered pages are capped at 100,000,000 pixels before allocation.
+
 Extraction options:
 
-- `maxPages`: maximum pages to inspect, default `20`.
-- `maxDimension`: maximum rendered PNG width or height, default `10,000`.
-- `maxPixels`: total rendered image pixel budget, default `4,000,000`.
+- `maxPages`: finite positive maximum pages to inspect, default `20` unless `pageNumbers` is provided.
+- `maxDimension`: finite positive maximum rendered PNG width or height, default `10,000`.
+- `maxPixels`: finite positive total rendered image pixel budget, default `4,000,000`.
 - `minTextChars`: text length threshold before image fallback, default `200`.
-- `pageNumbers`: one-based pages to inspect.
+- `pageNumbers`: one-based pages to inspect; an explicit list is not capped by the default `maxPages`.
 - `password`: optional PDF user password.
-- `renderScale`: preferred fallback render scale, default `1`.
+- `renderScale`: finite positive preferred fallback render scale, default `1`.
 
 ## Performance Snapshot
 

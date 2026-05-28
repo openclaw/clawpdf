@@ -40,6 +40,29 @@ describe("clawpdf", () => {
     }
   });
 
+  it("does not apply the default page cap to explicit pageNumbers", async () => {
+    const library = await loadClawPDF();
+    const pages = Array.from({ length: 25 }, (_, index) => `Page ${index + 1}`);
+    try {
+      const document = library.loadDocument(makeTextPdf(pages));
+      try {
+        const selected = document.extractText({ pageNumbers: pages.map((_, index) => index + 1) });
+        expect(selected).toContain("Page 1");
+        expect(selected).toContain("Page 21");
+        expect(selected).toContain("Page 25");
+
+        const capped = document.extractText({ maxPages: 2, pageNumbers: [3, 2, 1] });
+        expect(capped).toContain("Page 3");
+        expect(capped).toContain("Page 2");
+        expect(capped).not.toContain("Page 1");
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
+  });
+
   it("renders pages to RGBA and PNG", async () => {
     const library = await loadClawPDF();
     try {
@@ -166,6 +189,38 @@ describe("clawpdf", () => {
     } finally {
       library.destroy();
     }
+  });
+
+  it("rejects invalid render and extraction limits before allocation", async () => {
+    const library = await loadClawPDF();
+    try {
+      const document = library.loadDocument(makeTextPdf("Limits"));
+      try {
+        expect(() => document.renderPage(0, { scale: Number.NaN })).toThrow("scale must be a finite positive number");
+        expect(() => document.renderPage(0, { width: Number.POSITIVE_INFINITY })).toThrow(
+          "width must be a finite positive number",
+        );
+        expect(() => document.renderPage(0, { height: -1 })).toThrow("height must be a finite positive number");
+        expect(() => document.renderPage(0, { scale: 1_000 })).toThrow("Rendered page has");
+        expect(() => document.extractContent({ maxPixels: Number.POSITIVE_INFINITY })).toThrow(
+          "maxPixels must be a finite positive number",
+        );
+        expect(() => document.extractContent({ maxDimension: 0 })).toThrow(
+          "maxDimension must be a finite positive number",
+        );
+        expect(() => document.extractContent({ renderScale: Number.NaN })).toThrow(
+          "renderScale must be a finite positive number",
+        );
+      } finally {
+        document.destroy();
+      }
+    } finally {
+      library.destroy();
+    }
+
+    await expect(extractPdfContent(makeTextPdf("Limits"), { maxPixels: Number.POSITIVE_INFINITY })).rejects.toThrow(
+      "maxPixels must be a finite positive number",
+    );
   });
 
   it("rounds fractional rendered dimensions up", async () => {

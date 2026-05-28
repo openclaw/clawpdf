@@ -21,13 +21,16 @@ The RGBA byte length is always `width * height * 4`.
 
 ## Options
 
-- `scale`: multiplier, default `1`.
-- `width` and `height`: point-size override before scaling.
+- `scale`: finite positive multiplier, default `1`.
+- `width` and `height`: finite positive point-size override before scaling.
 - `renderForms`: render AcroForm widgets.
 - `transparent`: use a transparent page background instead of white.
 
 Rendered dimensions are rounded up with `Math.ceil`, matching common PDF
 renderer behavior for fractional page sizes.
+
+Rendered pages are capped at 100,000,000 pixels before allocation. Invalid,
+non-finite, zero, or negative size inputs throw `RangeError`.
 
 ## Original Dimensions
 

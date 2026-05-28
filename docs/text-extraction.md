@@ -26,9 +26,10 @@ indexes.
 
 ## Limits
 
-`extractText` stops after `maxPages` effective pages. It also caps returned text
-at 200,000 characters so huge PDFs cannot accidentally become enormous prompt
-payloads.
+`extractText` stops after `maxPages` effective pages. When `pageNumbers` is
+provided without `maxPages`, the explicit page list is used as-is instead of
+being capped by the default `20` pages. Text output is capped at 200,000
+characters so huge PDFs cannot accidentally become enormous prompt payloads.
 
 Invalid `pageNumbers` are ignored. For example, page `99` is skipped when the
 document has only three pages.

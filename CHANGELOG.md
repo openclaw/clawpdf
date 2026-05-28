@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added validation for render and extraction limits before PDFium allocation.
+- Fixed explicit `pageNumbers` extraction so the default page cap no longer truncates the list.
+- Increased the PDFium form-fill info buffer used for form rendering.
 - Added password support to the top-level extraction helper.
 - Added a maximum rendered image dimension cap for extraction fallback.
 - Added broader PDF extraction, rendering, password, error, PNG, and CI coverage.

@@ -70,3 +70,6 @@ encodePngRgbaCompressed(width, height, rgba): Promise<Uint8Array>;
 ```
 
 Both require `rgba.byteLength === width * height * 4`.
+
+Numeric render and extraction limits must be finite. Direct page renders are
+capped at 100,000,000 pixels before allocation.
