@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Redesigned the public API around `createEngine`, `openPdf`, `extractPdf`, one-based pages, typed errors, raw PNG bytes, and opt-in adapters.
 - Added Node path, URL, and `Blob` input normalization.
