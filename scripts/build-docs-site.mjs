@@ -339,9 +339,74 @@ function markdownToHtml(markdown, fromRel) {
 }
 
 function codeBlock(lang, source) {
+  const languageName = lang || "code";
   const language = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
-  const label = lang ? `<span>${escapeHtml(lang)}</span>` : "<span>code</span>";
-  return `<div class="code-wrap"${language}>${label}<button type="button" class="copy-button">Copy</button><pre><code>${escapeHtml(source)}</code></pre></div>`;
+  return `<div class="code-wrap"${language}>
+    <div class="code-toolbar">
+      <span class="code-lang">${escapeHtml(languageName)}</span>
+      <button type="button" class="copy-button" aria-label="Copy ${escapeHtml(languageName)} code">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <span class="copy-label">Copy</span>
+      </button>
+    </div>
+    <pre><code>${highlightCode(lang, source)}</code></pre>
+  </div>`;
+}
+
+function highlightCode(lang, source) {
+  const normalized = (lang || "").toLowerCase();
+  if (["ts", "tsx", "js", "jsx", "javascript", "typescript", "mjs"].includes(normalized)) {
+    return highlightByPatterns(source, [
+      ["comment", /\/\/[^\n]*|\/\*[\s\S]*?\*\//y],
+      ["string", /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/y],
+      ["number", /\b(?:0x[\da-f]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/iy],
+      ["keyword", /\b(?:await|using|async|const|let|var|import|from|export|function|return|if|else|try|catch|finally|for|of|in|new|type|interface|class|extends|implements|true|false|null|undefined)\b/y],
+      ["function", /\b[$A-Z_a-z][$\w]*(?=\s*\()/y],
+      ["property", /(?<=\.)[$A-Z_a-z][$\w]*/y],
+    ]);
+  }
+  if (["bash", "sh", "shell", "zsh"].includes(normalized)) {
+    return highlightByPatterns(source, [
+      ["comment", /#[^\n]*/y],
+      ["string", /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/y],
+      ["keyword", /\b(?:npm|pnpm|node|git|gh|curl|cd|export|echo|cat)\b/y],
+      ["number", /\b\d+(?:\.\d+)?\b/y],
+    ]);
+  }
+  if (normalized === "json") {
+    return highlightByPatterns(source, [
+      ["string", /"(?:\\.|[^"\\])*"(?=\s*:)/y],
+      ["property", /"(?:\\.|[^"\\])*"/y],
+      ["number", /-?\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b/iy],
+      ["keyword", /\b(?:true|false|null)\b/y],
+    ]);
+  }
+  return escapeHtml(source);
+}
+
+function highlightByPatterns(source, patterns) {
+  let html = "";
+  let index = 0;
+  while (index < source.length) {
+    let match = null;
+    for (const [kind, pattern] of patterns) {
+      pattern.lastIndex = index;
+      const candidate = pattern.exec(source);
+      if (candidate && candidate.index === index) {
+        match = [kind, candidate[0]];
+        break;
+      }
+    }
+    if (match) {
+      const [kind, value] = match;
+      html += `<span class="tok-${kind}">${escapeHtml(value)}</span>`;
+      index += value.length;
+    } else {
+      html += escapeHtml(source[index]);
+      index += 1;
+    }
+  }
+  return html;
 }
 
 function inlineMarkdown(text, fromRel) {
@@ -523,10 +588,15 @@ document.querySelector("#nav-search")?.addEventListener("input", (event) => {
 
 document.querySelectorAll(".copy-button").forEach((button) => {
   button.addEventListener("click", async () => {
-    const code = button.parentElement?.querySelector("code")?.textContent || "";
+    const label = button.querySelector(".copy-label");
+    const code = button.closest(".code-wrap")?.querySelector("code")?.textContent || "";
     await navigator.clipboard.writeText(code);
-    button.textContent = "Copied";
-    setTimeout(() => { button.textContent = "Copy"; }, 1400);
+    button.classList.add("is-copied");
+    if (label) label.textContent = "Copied";
+    setTimeout(() => {
+      button.classList.remove("is-copied");
+      if (label) label.textContent = "Copy";
+    }, 1400);
   });
 });`;
 }
@@ -551,6 +621,16 @@ function css() {
   --teal-soft: rgba(8, 127, 140, 0.11);
   --code-bg: #0f1724;
   --code-text: #eef6ff;
+  --code-muted: #9fb0c3;
+  --code-line: rgba(255, 255, 255, 0.12);
+  --code-button: rgba(255, 255, 255, 0.08);
+  --code-button-hover: rgba(255, 255, 255, 0.14);
+  --tok-keyword: #78dce8;
+  --tok-string: #ffd580;
+  --tok-comment: #7d8da1;
+  --tok-number: #ab9df2;
+  --tok-function: #a9dc76;
+  --tok-property: #ffb86c;
   --shadow: 0 4px 16px rgba(18, 21, 27, 0.08);
   --shadow-strong: 0 18px 42px rgba(18, 21, 27, 0.12);
 }
@@ -573,6 +653,16 @@ function css() {
   --teal-soft: rgba(54, 191, 202, 0.14);
   --code-bg: #070b12;
   --code-text: #eef6ff;
+  --code-muted: #8493a8;
+  --code-line: rgba(255, 255, 255, 0.1);
+  --code-button: rgba(255, 255, 255, 0.07);
+  --code-button-hover: rgba(255, 255, 255, 0.13);
+  --tok-keyword: #79d8ff;
+  --tok-string: #ffd166;
+  --tok-comment: #738197;
+  --tok-number: #c7a6ff;
+  --tok-function: #9be080;
+  --tok-property: #ffad66;
   --shadow: 0 4px 18px rgba(0, 0, 0, 0.38);
   --shadow-strong: 0 18px 42px rgba(0, 0, 0, 0.42);
 }
@@ -886,29 +976,68 @@ main {
   color: var(--code-text);
   overflow: hidden;
   border: 1px solid #1f2937;
+  box-shadow: 0 12px 28px rgba(15, 23, 36, 0.14);
 }
-.code-wrap > span {
+.code-toolbar {
   position: absolute;
-  left: 0.85rem;
-  top: 0.62rem;
-  color: #9fb0c3;
+  inset: 0 0 auto;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 2.55rem;
+  border-bottom: 1px solid var(--code-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0));
+  padding: 0.5rem 0.55rem 0.45rem 0.85rem;
+}
+.code-lang {
+  color: var(--code-muted);
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
+  line-height: 1;
 }
 .copy-button {
-  position: absolute;
-  top: 0.48rem;
-  right: 0.5rem;
-  padding: 0.24rem 0.52rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  min-height: 1.62rem;
+  border: 1px solid var(--code-line);
+  border-radius: 7px;
+  padding: 0.24rem 0.5rem;
   color: var(--code-text);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  font-size: 0.78rem;
+  background: var(--code-button);
+  cursor: pointer;
+  font: 700 0.76rem/1 "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.copy-button:hover {
+  background: var(--code-button-hover);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+.copy-button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.copy-button.is-copied {
+  color: #dffcfb;
+  background: rgba(8, 127, 140, 0.45);
+  border-color: rgba(120, 220, 232, 0.5);
+}
+.copy-button svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .doc pre {
   margin: 0;
-  padding: 2.7rem 1rem 1rem;
+  padding: 3.05rem 1rem 1rem;
   overflow-x: auto;
   line-height: 1.5;
   max-width: 100%;
@@ -921,6 +1050,12 @@ main {
   padding: 0;
   font-size: 1em;
 }
+.tok-keyword { color: var(--tok-keyword); }
+.tok-string { color: var(--tok-string); }
+.tok-comment { color: var(--tok-comment); font-style: italic; }
+.tok-number { color: var(--tok-number); }
+.tok-function { color: var(--tok-function); }
+.tok-property { color: var(--tok-property); }
 .anchor {
   position: absolute;
   left: -1.05em;

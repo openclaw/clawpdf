@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added syntax highlighting and polished copy buttons to the documentation site code blocks.
 - Expanded README usage examples and fixed copy-pasteable docs snippets.
 - Restyled the GitHub Pages documentation site with a gogcli-like docs shell, home hero, search, page heroes, and canonical custom-domain URLs.
 
