@@ -32,6 +32,16 @@ const result = await extractPdf("secret.pdf", {
 The password is used only for opening the document. It is not retained after the
 document is loaded.
 
+## CLI
+
+```bash
+clawpdf secret.pdf --password secret
+clawpdf secret.pdf --password-file ./password.txt
+```
+
+Prefer `--password-file` for scripts when the password should not appear in the
+shell history or process list.
+
 ## Unsupported Security Handlers
 
 PDFium reports unsupported encryption or security handlers as

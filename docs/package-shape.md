@@ -16,6 +16,8 @@ Runtime dependencies:
 
 Published files:
 
+- `dist/cli.js`
+- `dist/cli.d.ts`
 - `dist/index.js`
 - `dist/index.d.ts`
 - `dist/browser.js`

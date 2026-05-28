@@ -26,6 +26,9 @@
       "import": "./dist/adapters/index.js"
     }
   },
+  "bin": {
+    "clawpdf": "./dist/cli.js"
+  },
   "files": [
     "dist",
     "CHANGELOG.md",
@@ -40,6 +43,7 @@
     "download:pdfium": "node scripts/download-pdfium.mjs",
     "prepack": "pnpm build",
     "test": "pnpm build && vitest run",
+    "test:cli": "pnpm build && node scripts/test-cli-e2e.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

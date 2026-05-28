@@ -49,6 +49,20 @@ await writeFile("page-1.png", png);
 
 All user-facing page numbers are one-based.
 
+## CLI
+
+The package also installs a `clawpdf` command:
+
+```bash
+clawpdf report.pdf
+cat report.pdf | clawpdf -
+clawpdf report.pdf --json
+clawpdf render report.pdf --page 1 > page.png
+```
+
+Use `--password` or `--password-file` for encrypted PDFs. See the
+[CLI docs](https://clawpdf.dev/cli.html) for flags, JSON output, and exit codes.
+
 ## Reuse an Engine
 
 Server code should create one PDFium engine and reuse it:
@@ -135,6 +149,7 @@ Wrong or missing passwords throw `PdfPasswordError`.
 Feature docs:
 
 - [Loading PDFs](https://clawpdf.dev/loading.html)
+- [CLI](https://clawpdf.dev/cli.html)
 - [Text extraction](https://clawpdf.dev/text-extraction.html)
 - [Page rendering](https://clawpdf.dev/page-rendering.html)
 - [PNG output](https://clawpdf.dev/png-output.html)
@@ -177,6 +192,8 @@ Release history: see `CHANGELOG.md`.
 Published files:
 
 - `dist/index.js`
+- `dist/cli.d.ts`
+- `dist/cli.js`
 - `dist/browser.js`
 - `dist/adapters/index.js`
 - `dist/vendor/pdfium.esm.js`
