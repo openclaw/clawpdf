@@ -19,6 +19,12 @@ const result = await extractPdfContent(pdfBytes, {
 });
 ```
 
+Pass `library` when you already own a long-lived `ClawPDF` handle:
+
+```ts
+const result = await extractPdfContent(pdfBytes, { library, minTextChars: 200 });
+```
+
 Flow:
 
 1. Extract text from selected pages.
@@ -35,6 +41,10 @@ Flow:
 - `pageNumbers`: one-based pages to inspect; an explicit list is not capped by the default `maxPages`.
 - `password`: optional PDF user password.
 - `renderScale`: finite positive preferred fallback render scale, default `1`.
+- `library`: optional `ClawPDF` instance for the top-level helper.
+
+Use `library.extractPdfContent(...)` directly when you already own a long-lived
+library handle.
 
 ## Result
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Refactored PDFium lifetime handling so top-level extraction reuses a shared library and `ClawPDF.destroy()` refuses to run while documents are open.
 - Added validation for render and extraction limits before PDFium allocation.
 - Fixed explicit `pageNumbers` extraction so the default page cap no longer truncates the list.
 - Increased the PDFium form-fill info buffer used for form rendering.

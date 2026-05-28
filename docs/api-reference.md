@@ -31,7 +31,8 @@ Options:
 ## `ClawPDF`
 
 - `loadDocument(input, password?)`: load PDF bytes.
-- `destroy()`: release PDFium library resources.
+- `extractPdfContent(input, options?)`: high-level text-first extraction using this library.
+- `destroy()`: release PDFium library resources; throws while documents are open.
 - `pdfiumRelease`: current `pdfium-lib` release.
 - `wasmSha256`: current WASM SHA-256.
 
@@ -49,8 +50,9 @@ Options:
 
 ## `extractPdfContent(input, options?)`
 
-High-level async helper. It loads PDFium, opens one document, runs compressed
-text-first extraction, and tears everything down.
+High-level async helper. It opens one document, runs compressed text-first
+extraction, and closes the document. When no `library` is provided, it reuses a
+shared package-level PDFium library.
 
 Options:
 
@@ -61,6 +63,7 @@ Options:
 - `pageNumbers?: number[]`
 - `password?: string`
 - `renderScale?: number`
+- `library?: ClawPDF`
 
 ## PNG Encoders
 

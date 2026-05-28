@@ -49,6 +49,10 @@ try {
 }
 ```
 
+For server code, keep one `ClawPDF` library alive and reuse it. The top-level
+`extractPdfContent(...)` helper also shares a default library when no `library`
+option is provided.
+
 ## Feature Map
 
 - [Loading PDFs](loading.md) covers library setup, WASM loading, lifetimes, and passwords.

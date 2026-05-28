@@ -58,6 +58,7 @@ try {
 
 PDF page indexes in the document API are zero-based. `extractContent` accepts
 one-based `pageNumbers` because that matches user-facing PDF page numbers.
+Server code should load one `ClawPDF` library and reuse it across requests.
 
 ## Text-First Extraction
 
@@ -74,6 +75,12 @@ const result = await extractPdfContent(pdfBytes, {
 
 console.log(result.text);
 console.log(result.images); // PNG base64 pages only when text was too short
+```
+
+Pass `library` when you already own a long-lived `ClawPDF` handle:
+
+```ts
+const result = await extractPdfContent(pdfBytes, { library, minTextChars: 200 });
 ```
 
 This mirrors the OpenClaw fallback flow:
@@ -113,7 +120,8 @@ Node can load the packaged `dist/vendor/pdfium.wasm` automatically.
 ### `ClawPDF`
 
 - `loadDocument(bytes, password?)`: returns `PdfDocument`.
-- `destroy()`: releases the PDFium library.
+- `extractPdfContent(bytes, options?)`: high-level text-first extraction using this library.
+- `destroy()`: releases the PDFium library; throws while documents are still open.
 - `pdfiumRelease`: current vendored `pdfium-lib` release tag.
 - `wasmSha256`: SHA-256 of the vendored WASM.
 
@@ -149,6 +157,7 @@ Extraction options:
 - `pageNumbers`: one-based pages to inspect; an explicit list is not capped by the default `maxPages`.
 - `password`: optional PDF user password.
 - `renderScale`: finite positive preferred fallback render scale, default `1`.
+- `library`: optional `ClawPDF` instance for the top-level `extractPdfContent(...)` helper.
 
 ## Performance Snapshot
 

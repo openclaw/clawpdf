@@ -40,6 +40,10 @@ export type PdfExtractOptions = {
   renderScale?: number;
 };
 
+export type ExtractPdfContentOptions = PdfExtractOptions & {
+  library?: ClawPDF;
+};
+
 export type PdfExtractedImage = {
   data: string;
   mimeType: "image/png";
@@ -61,6 +65,7 @@ const defaultMaxPixels = 4_000_000;
 const defaultMinTextChars = 200;
 const maxRenderPixels = 100_000_000;
 const formFillInfoBytes = 1024;
+let defaultLibrary: Promise<ClawPDF> | undefined;
 
 export async function loadClawPDF(options: ClawPdfLoadOptions = {}): Promise<ClawPDF> {
   const loadOptions: LoadPdfiumOptions = {};
@@ -86,29 +91,42 @@ export async function loadClawPDF(options: ClawPdfLoadOptions = {}): Promise<Cla
   return new ClawPDF(module);
 }
 
+async function loadDefaultClawPDF(): Promise<ClawPDF> {
+  defaultLibrary ??= loadClawPDF().catch((error: unknown) => {
+    defaultLibrary = undefined;
+    throw error;
+  });
+  return defaultLibrary;
+}
+
 export async function extractPdfContent(
   input: Uint8Array | ArrayBuffer,
-  options: PdfExtractOptions = {},
+  options: ExtractPdfContentOptions = {},
 ): Promise<PdfExtractResult> {
-  const library = await loadClawPDF();
-  try {
-    const document = library.loadDocument(input, options.password);
-    try {
-      return await document.extractContentCompressed(options);
-    } finally {
-      document.destroy();
-    }
-  } finally {
-    library.destroy();
-  }
+  const { library: providedLibrary, ...extractOptions } = options;
+  const library = providedLibrary ?? await loadDefaultClawPDF();
+  return library.extractPdfContent(input, extractOptions);
 }
 
 export class ClawPDF {
   readonly pdfiumRelease = PDFIUM_RELEASE;
   readonly wasmSha256 = PDFIUM_WASM_SHA256;
   #destroyed = false;
+  #openDocuments = 0;
 
   constructor(private readonly module: PdfiumModule) {}
+
+  async extractPdfContent(
+    input: Uint8Array | ArrayBuffer,
+    options: PdfExtractOptions = {},
+  ): Promise<PdfExtractResult> {
+    const document = this.loadDocument(input, options.password);
+    try {
+      return await document.extractContentCompressed(options);
+    } finally {
+      document.destroy();
+    }
+  }
 
   loadDocument(input: Uint8Array | ArrayBuffer, password = ""): PdfDocument {
     this.#assertLive();
@@ -125,12 +143,18 @@ export class ClawPDF {
       this.module.wasmExports.free(documentPtr);
       throw new Error(pdfLoadErrorMessage(this.module._FPDF_GetLastError()));
     }
-    return new PdfDocument(this.module, documentHandle, documentPtr);
+    this.#openDocuments += 1;
+    return new PdfDocument(this.module, documentHandle, documentPtr, () => {
+      this.#openDocuments -= 1;
+    });
   }
 
   destroy(): void {
     if (this.#destroyed) {
       return;
+    }
+    if (this.#openDocuments > 0) {
+      throw new Error(`Cannot destroy ClawPDF library with ${this.#openDocuments} open document(s)`);
     }
     this.module._FPDF_DestroyLibrary();
     this.#destroyed = true;
@@ -167,6 +191,7 @@ export class PdfDocument {
     private readonly module: PdfiumModule,
     private readonly documentHandle: number,
     private readonly documentPtr: number,
+    private readonly releaseDocument: () => void,
   ) {}
 
   get pageCount(): number {
@@ -380,6 +405,7 @@ export class PdfDocument {
     this.module._FPDF_CloseDocument(this.documentHandle);
     this.module.wasmExports.free(this.documentPtr);
     this.#destroyed = true;
+    this.releaseDocument();
   }
 
   #effectivePageIndexes(maxPages?: number, pageNumbers?: number[]): number[] {

@@ -115,6 +115,33 @@ describe("clawpdf", () => {
     expect(withImage.images[0]?.data.length).toBeLessThan(20_000);
   });
 
+  it("supports reusable library extraction and guards destroy with open documents", async () => {
+    const pdf = makeTextPdf("Reusable");
+    const library = await loadClawPDF();
+    const document = library.loadDocument(pdf);
+    try {
+      expect(() => library.destroy()).toThrow("Cannot destroy ClawPDF library with 1 open document(s)");
+    } finally {
+      document.destroy();
+    }
+
+    const extracted = await library.extractPdfContent(pdf, { minTextChars: 1 });
+    expect(extracted.text).toContain("Reusable");
+
+    library.destroy();
+    expect(() => library.loadDocument(pdf)).toThrow("ClawPDF library has been destroyed");
+  });
+
+  it("runs concurrent top-level extraction without per-call library teardown", async () => {
+    const [first, second] = await Promise.all([
+      extractPdfContent(makeTextPdf("Concurrent one"), { minTextChars: 1 }),
+      extractPdfContent(makeTextPdf("Concurrent two"), { minTextChars: 1 }),
+    ]);
+
+    expect(first.text).toContain("Concurrent one");
+    expect(second.text).toContain("Concurrent two");
+  });
+
   it("keeps fallback render images inside maxPixels and maxDimension", async () => {
     const pdf = makeTextPdf("", { width: 1000, height: 200 });
     const byPixels = await extractPdfContent(pdf, { minTextChars: 1, maxPages: 1, maxPixels: 100 });

@@ -34,6 +34,13 @@ Each `library.loadDocument(...)` call returns a `PdfDocument`. Call
 `document.destroy()` after extraction or rendering so PDFium can release document
 memory.
 
+`library.destroy()` throws while documents opened by that library are still
+alive. Server code should keep one `ClawPDF` library around and reuse it across
+requests instead of loading and destroying PDFium per file.
+
+For one-shot extraction, `extractPdfContent(...)` uses a shared package-level
+library unless you pass your own `library` option.
+
 ## Passwords
 
 Pass a user password as the second `loadDocument` argument:
