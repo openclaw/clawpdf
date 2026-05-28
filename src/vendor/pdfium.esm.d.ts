@@ -9,6 +9,8 @@ export type PdfiumModule = {
   _FPDF_ClosePage(page: number): void;
   _FPDF_GetPageWidth(page: number): number;
   _FPDF_GetPageHeight(page: number): number;
+  _FPDFPage_GetRotation(page: number): number;
+  _FPDF_GetMetaText(document: number, tagPtr: number, buffer: number, bufferLength: number): number;
   _FPDFText_LoadPage(page: number): number;
   _FPDFText_ClosePage(textPage: number): void;
   _FPDFText_CountChars(textPage: number): number;

@@ -18,6 +18,10 @@ Published files:
 
 - `dist/index.js`
 - `dist/index.d.ts`
+- `dist/browser.js`
+- `dist/browser.d.ts`
+- `dist/adapters/index.js`
+- `dist/adapters/index.d.ts`
 - `dist/vendor/pdfium.esm.js`
 - `dist/vendor/pdfium.esm.wasm`
 - `CHANGELOG.md`

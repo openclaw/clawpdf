@@ -5,34 +5,30 @@ description: Extract selectable PDF text from one page or selected pages.
 
 # Text Extraction
 
-Use `getPageText(pageIndex)` for one zero-based page.
+All page numbers are one-based.
 
 ```ts
-const text = document.getPageText(0);
+const firstPageText = pdf.page(1).text();
 ```
 
-Use `extractText(...)` for a multi-page text pass.
+Use `document.text(...)` for multi-page extraction:
 
 ```ts
-const text = document.extractText({
+const text = pdf.text({
   maxPages: 5,
-  pageNumbers: [1, 3, 4],
+  pages: [1, 3, 4],
+  maxChars: 200_000,
 });
 ```
 
-`pageNumbers` are one-based because they are user-facing PDF page numbers.
-Direct document APIs such as `getPageText(0)` and `renderPage(0)` use zero-based
-indexes.
+When `pages` is provided without `maxPages`, the explicit page list is used as
+is. Invalid page numbers throw `PdfPageRangeError`.
 
 ## Limits
 
-`extractText` stops after `maxPages` effective pages. When `pageNumbers` is
-provided without `maxPages`, the explicit page list is used as-is instead of
-being capped by the default `20` pages. Text output is capped at 200,000
-characters so huge PDFs cannot accidentally become enormous prompt payloads.
-
-Invalid `pageNumbers` are ignored. For example, page `99` is skipped when the
-document has only three pages.
+`text(...)` stops after `maxPages` effective pages. Text output is capped by
+`maxChars`, default `200_000`, so huge PDFs cannot accidentally become enormous
+prompt payloads.
 
 ## Text Shape
 

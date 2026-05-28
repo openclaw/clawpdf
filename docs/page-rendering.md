@@ -5,12 +5,12 @@ description: Render PDF pages to RGBA bitmaps with predictable size controls.
 
 # Page Rendering
 
-`renderPage(pageIndex, options)` returns RGBA bytes for one zero-based page.
+All page numbers are one-based.
 
 ```ts
-const rendered = document.renderPage(0, {
-  scale: 2,
-  renderForms: true,
+const rendered = pdf.page(1).render({
+  dpi: 144,
+  forms: true,
 });
 
 console.log(rendered.width, rendered.height);
@@ -19,23 +19,31 @@ console.log(rendered.rgba.byteLength);
 
 The RGBA byte length is always `width * height * 4`.
 
+## Sizing
+
+Render sizing accepts zero or one of:
+
+- `dpi`: points are scaled from a 72 DPI baseline.
+- `scale`: direct page scale.
+- `width`: target pixel width; height follows page aspect ratio.
+- `height`: target pixel height; width follows page aspect ratio.
+
+Omitting all size fields defaults to `{ dpi: 96 }`. Passing more than one size
+field throws `PdfError`.
+
 ## Options
 
-- `scale`: finite positive multiplier, default `1`.
-- `width` and `height`: finite positive point-size override before scaling.
-- `renderForms`: render AcroForm widgets.
-- `transparent`: use a transparent page background instead of white.
+- `background`: `"white"` or `"transparent"`, default `"white"`.
+- `forms`: render AcroForm widgets, default `false`.
+- `rotate`: additive rotation, one of `0`, `90`, `180`, `270`.
 
-Rendered dimensions are rounded up with `Math.ceil`, matching common PDF
-renderer behavior for fractional page sizes.
+Rendered dimensions are rounded up with `Math.ceil`. Rendered pages are capped
+before allocation. Budget failures throw `PdfBudgetError`.
 
-Rendered pages are capped at 100,000,000 pixels before allocation. Invalid,
-non-finite, zero, or negative size inputs throw `RangeError`.
+## Page Properties
 
-## Original Dimensions
+`PdfPage` exposes:
 
-The returned object includes:
-
-- `width` and `height`: rendered pixel dimensions.
-- `originalWidth` and `originalHeight`: page dimensions reported by PDFium.
-- `rgba`: rendered bitmap bytes.
+- `index`: one-based page number.
+- `width` and `height`: PDF points.
+- `rotation`: embedded page rotation.

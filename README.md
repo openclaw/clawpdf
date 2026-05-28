@@ -6,10 +6,9 @@ Zero-dependency PDFium WebAssembly bindings for Node and browsers.
 
 Docs: <https://clawpdf.dev/>
 
-`clawpdf` is intentionally small: load a PDF, extract text, render pages to RGBA,
-or encode rendered pages as PNGs. It ships the PDFium WASM binary in the package
-and has no runtime dependencies, native addons, postinstall scripts, or canvas
-dependency.
+`clawpdf` loads PDFs, extracts text, renders pages, and encodes PNG fallback
+images without runtime dependencies, native addons, postinstall scripts, or a
+canvas package.
 
 ## Why
 
@@ -29,65 +28,62 @@ This package currently vendors `pdfium-lib` release `7623`.
 npm install clawpdf
 ```
 
-ESM-only. Node 20+ is supported. Browsers and bundlers can pass `wasmUrl` or
-`wasmBinary` explicitly.
+ESM-only. Node 20+ is supported.
 
 ## Quick Start
 
 ```ts
-import { loadClawPDF } from "clawpdf";
+import { openPdf } from "clawpdf";
 
-const library = await loadClawPDF();
+await using pdf = await openPdf("report.pdf");
 
-try {
-  const document = library.loadDocument(await fs.promises.readFile("report.pdf"));
+console.log(pdf.pageCount);
+console.log(pdf.text({ maxPages: 5 }));
 
-  try {
-    console.log(document.pageCount);
-    console.log(document.extractText({ maxPages: 5 }));
-
-    const page = await document.renderPagePngCompressed(0, { scale: 2, renderForms: true });
-    await fs.promises.writeFile("page-1.png", page.png);
-  } finally {
-    document.destroy();
-  }
-} finally {
-  library.destroy();
-}
+const png = await pdf.page(1).png({ dpi: 144, forms: true });
+await fs.promises.writeFile("page-1.png", png);
 ```
 
-PDF page indexes in the document API are zero-based. `extractContent` accepts
-one-based `pageNumbers` because that matches user-facing PDF page numbers.
-Server code should load one `ClawPDF` library and reuse it across requests.
+All user-facing page numbers are one-based.
+
+Server code should create one engine and reuse it:
+
+```ts
+import { createEngine } from "clawpdf";
+
+await using engine = await createEngine();
+
+const result = await engine.extract(pdfBytes, {
+  mode: "auto",
+  maxPages: 20,
+});
+```
 
 ## Text-First Extraction
 
 ```ts
-import { extractPdfContent } from "clawpdf";
+import { extractPdf } from "clawpdf";
+import { toMessageContent } from "clawpdf/adapters";
 
-const result = await extractPdfContent(pdfBytes, {
-  maxPages: 20,
-  maxDimension: 10_000,
-  maxPixels: 4_000_000,
+const result = await extractPdf("report.pdf", {
+  mode: "auto",
   minTextChars: 200,
-  password: "optional user password",
+  maxPages: 20,
+  image: {
+    dpi: 96,
+    maxPixels: 4_000_000,
+    maxDimension: 10_000,
+    forms: true,
+  },
 });
 
 console.log(result.text);
-console.log(result.images); // PNG base64 pages only when text was too short
+console.log(result.images); // raw PNG bytes
+console.log(toMessageContent(result)); // transport-shaped blocks
 ```
 
-Pass `library` when you already own a long-lived `ClawPDF` handle:
-
-```ts
-const result = await extractPdfContent(pdfBytes, { library, minTextChars: 200 });
-```
-
-This mirrors the OpenClaw fallback flow:
-
-1. Extract text from selected pages.
-2. If enough text was found, return text only.
-3. Otherwise render selected pages within a pixel budget and return PNG images.
+`auto` always extracts text and renders PNG images only when extracted text is
+shorter than `minTextChars`.
 
 ## API
 
@@ -105,59 +101,15 @@ Feature docs:
 - [Performance](https://clawpdf.dev/performance.html)
 - [API reference](https://clawpdf.dev/api-reference.html)
 
-### `loadClawPDF(options?)`
+Core exports:
 
-Loads PDFium and returns a `ClawPDF` library handle.
-
-Options:
-
-- `wasmUrl`: URL/path passed to the PDFium Emscripten loader.
-- `wasmBinary`: raw WASM bytes.
-- `instantiateWasm`: custom Emscripten instantiate hook.
-
-Node can load the packaged `dist/vendor/pdfium.wasm` automatically.
-
-### `ClawPDF`
-
-- `loadDocument(bytes, password?)`: returns `PdfDocument`.
-- `extractPdfContent(bytes, options?)`: high-level text-first extraction using this library.
-- `destroy()`: releases the PDFium library; throws while documents are still open.
-- `pdfiumRelease`: current vendored `pdfium-lib` release tag.
-- `wasmSha256`: SHA-256 of the vendored WASM.
-
-### `PdfDocument`
-
-- `pageCount`: number of pages.
-- `getPageText(pageIndex)`: text for one zero-based page.
-- `extractText({ maxPages, pageNumbers })`: text for selected pages.
-- `renderPage(pageIndex, options)`: RGBA bitmap.
-- `renderPagePng(pageIndex, options)`: sync PNG bytes with stored zlib blocks.
-- `renderPagePngCompressed(pageIndex, options)`: compressed PNG bytes.
-- `extractContent(options)`: sync text-first extraction with stored-PNG image fallback.
-- `extractContentCompressed(options)`: async text-first extraction with compressed-PNG image fallback.
-- `destroy()`: releases PDF document memory.
-
-The top-level async `extractPdfContent(...)` helper uses compressed PNG output.
-
-Render options:
-
-- `scale`: finite positive multiplier, default `1`.
-- `width` / `height`: finite positive point-size override before scaling.
-- `renderForms`: render AcroForm widgets.
-- `transparent`: transparent page background.
-
-Rendered pages are capped at 100,000,000 pixels before allocation.
-
-Extraction options:
-
-- `maxPages`: finite positive maximum pages to inspect, default `20` unless `pageNumbers` is provided.
-- `maxDimension`: finite positive maximum rendered PNG width or height, default `10,000`.
-- `maxPixels`: finite positive total rendered image pixel budget, default `4,000,000`.
-- `minTextChars`: text length threshold before image fallback, default `200`.
-- `pageNumbers`: one-based pages to inspect; an explicit list is not capped by the default `maxPages`.
-- `password`: optional PDF user password.
-- `renderScale`: finite positive preferred fallback render scale, default `1`.
-- `library`: optional `ClawPDF` instance for the top-level `extractPdfContent(...)` helper.
+- `extractPdf(input, options?)`: one-shot extraction with a shared engine.
+- `openPdf(input, options?)`: open one document with private lifetime.
+- `createEngine(options?)`: create a reusable PDFium engine.
+- `releaseExtractEngine()`: dispose the shared extraction engine after in-flight calls finish.
+- `encodePng(rgba, { width, height, compress })`: standalone RGBA to PNG.
+- `PdfError` subclasses for typed failures.
+- `PDFIUM_RELEASE` and `PDFIUM_WASM_SHA256`.
 
 ## Performance Snapshot
 
@@ -180,7 +132,8 @@ Release history: see `CHANGELOG.md`.
 Published files:
 
 - `dist/index.js`
-- `dist/index.d.ts`
+- `dist/browser.js`
+- `dist/adapters/index.js`
 - `dist/vendor/pdfium.esm.js`
 - `dist/vendor/pdfium.esm.wasm`
 - `CHANGELOG.md`
@@ -189,8 +142,7 @@ Published files:
 Current vendored binary:
 
 - `pdfium-lib`: `7623`
-- `src/vendor/pdfium.wasm` SHA-256:
-  `14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e`
+- WASM SHA-256: `14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e`
 
 ## Refresh PDFium
 
@@ -199,14 +151,12 @@ pnpm download:pdfium
 pnpm test
 ```
 
-`scripts/download-pdfium.mjs` downloads the pinned `wasm.tgz` asset, verifies the
-archive hash and WASM hash, then updates `src/vendor`.
-
 To move to a newer `pdfium-lib` release, update the release tag and hashes in:
 
 - `scripts/download-pdfium.mjs`
 - `src/constants.ts`
 - this README
+- `docs/pdfium-provenance.md`
 
 ## License
 

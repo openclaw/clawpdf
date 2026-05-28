@@ -1,46 +1,29 @@
-import { createEngineImpl } from "./engine.js";
+import { createEngine as createCoreEngine } from "./index.js";
+import { type EngineOptions, type OpenPdfOptions } from "./engine.js";
 import { type ExtractOptions, type ExtractResult } from "./extract.js";
 import { type PdfInput } from "./input.js";
-import { encodePngRgba, encodePngRgbaCompressed } from "./png.js";
 
-export { PDFIUM_RELEASE, PDFIUM_WASM_SHA256 } from "./constants.js";
-export {
-  PdfBudgetError,
-  PdfDestroyedError,
-  PdfError,
-  PdfFormatError,
-  PdfPageRangeError,
-  PdfPasswordError,
-  PdfSecurityError,
-} from "./errors.js";
-export type { EngineOptions, OpenPdfOptions, PdfDocument, PdfEngine } from "./engine.js";
-export type { ExtractMode, ExtractOptions, ExtractResult, PdfImage } from "./extract.js";
-export type { PdfInput } from "./input.js";
-export type { PdfMetadata } from "./document.js";
-export type { PdfPage } from "./page.js";
-export type { RenderOptions } from "./render.js";
+export * from "./index.js";
 
-export type EncodePngOptions = {
-  width: number;
-  height: number;
-  compress?: boolean;
-};
-
+const browserWasmUrl = new URL("./vendor/pdfium.esm.wasm", import.meta.url).href;
 let sharedEngine: Promise<import("./engine.js").PdfEngine> | undefined;
 let sharedInFlight = 0;
 let sharedReleaseRequested = false;
 
-export async function createEngine(options: import("./engine.js").EngineOptions = {}): Promise<import("./engine.js").PdfEngine> {
-  return createEngineImpl(options);
+export async function createEngine(options: EngineOptions = {}): Promise<import("./engine.js").PdfEngine> {
+  return createCoreEngine({
+    wasmUrl: browserWasmUrl,
+    ...options,
+  });
 }
 
 export async function openPdf(
   input: PdfInput,
-  options: import("./engine.js").OpenPdfOptions = {},
+  options: OpenPdfOptions = {},
 ): Promise<import("./engine.js").PdfDocument> {
-  const engine = await createEngineImpl();
+  const engine = await createEngine();
   try {
-    return await engine.openPrivate(input, options);
+    return await (engine as import("./engine.js").EngineImpl).openPrivate(input, options);
   } catch (error) {
     await engine.destroy();
     throw error;
@@ -69,24 +52,6 @@ export async function releaseExtractEngine(): Promise<void> {
   if (sharedInFlight === 0) {
     await disposeSharedEngine();
   }
-}
-
-export function encodePng(
-  rgba: Uint8Array,
-  options: EncodePngOptions & { compress: false },
-): Uint8Array;
-export function encodePng(
-  rgba: Uint8Array,
-  options: EncodePngOptions & { compress?: true },
-): Promise<Uint8Array>;
-export function encodePng(
-  rgba: Uint8Array,
-  options: EncodePngOptions,
-): Promise<Uint8Array> | Uint8Array {
-  if (options.compress === false) {
-    return encodePngRgba(options.width, options.height, rgba);
-  }
-  return encodePngRgbaCompressed(options.width, options.height, rgba);
 }
 
 async function getSharedEngine(): Promise<import("./engine.js").PdfEngine> {

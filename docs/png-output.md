@@ -7,39 +7,32 @@ description: Encode rendered pages as dependency-free PNG images.
 
 ClawPDF includes PNG output so Node users do not need a native canvas package.
 
-## Sync PNG
+## Page PNG
 
-`renderPagePng(...)` returns PNG bytes synchronously.
-
-```ts
-const page = document.renderPagePng(0, { scale: 2 });
-await fs.promises.writeFile("page.png", page.png);
-```
-
-The sync encoder uses stored zlib blocks. It is useful as a simple immediate
-fallback, but the output is larger for full-page renders.
-
-## Compressed PNG
-
-`renderPagePngCompressed(...)` returns compressed PNG bytes asynchronously.
+`page.png(...)` returns compressed PNG bytes asynchronously:
 
 ```ts
-const page = await document.renderPagePngCompressed(0, {
-  scale: 2,
-  renderForms: true,
-});
+const png = await pdf.page(1).png({ dpi: 144, forms: true });
+await fs.promises.writeFile("page.png", png);
 ```
 
-On Node, compressed PNG uses native `node:zlib`. In browsers, it uses
-`CompressionStream` when available and falls back to stored zlib blocks
-otherwise.
+`page.pngSync(...)` returns PNG bytes synchronously using stored zlib blocks.
+The output is larger, but it is useful when a strictly sync path matters.
+
+```ts
+const png = pdf.page(1).pngSync({ scale: 2 });
+```
 
 ## Standalone Encoding
 
 You can encode RGBA bytes directly:
 
 ```ts
-import { encodePngRgba, encodePngRgbaCompressed } from "clawpdf";
+import { encodePng } from "clawpdf";
 
-const png = await encodePngRgbaCompressed(width, height, rgba);
+const compressed = await encodePng(rgba, { width, height });
+const stored = encodePng(rgba, { width, height, compress: false });
 ```
+
+On Node, compressed PNG uses native `node:zlib`. In browsers, it uses
+`CompressionStream` when available and falls back to stored zlib blocks.

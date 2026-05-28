@@ -1,3 +1,5 @@
+import { PdfFormatError } from "./errors.js";
+
 const pngSignature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const crcTable = makeCrcTable();
 
@@ -15,10 +17,10 @@ export async function encodePngRgbaCompressed(width: number, height: number, rgb
 
 function validatePngInput(width: number, height: number, rgba: Uint8Array): void {
   if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
-    throw new RangeError("PNG dimensions must be positive integers");
+    throw new PdfFormatError("PNG dimensions must be positive integers");
   }
   if (rgba.byteLength !== width * height * 4) {
-    throw new RangeError(`RGBA buffer has ${rgba.byteLength} bytes; expected ${width * height * 4}`);
+    throw new PdfFormatError(`RGBA buffer has ${rgba.byteLength} bytes; expected ${width * height * 4}`);
   }
 }
 

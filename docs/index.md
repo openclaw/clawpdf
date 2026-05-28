@@ -6,8 +6,8 @@ description: Zero-dependency PDFium WebAssembly bindings for text extraction and
 # ClawPDF
 
 ClawPDF is a small PDFium WebAssembly wrapper for Node and browsers. It loads
-PDF bytes, extracts text, renders pages, and produces PNG fallback images
-without pulling in a native canvas package, postinstall scripts, or runtime
+PDF input, extracts text, renders pages, and produces PNG fallback images
+without pulling in native canvas packages, postinstall scripts, or runtime
 dependencies.
 
 It is built for OpenClaw's fallback PDF path: extract text first, render selected
@@ -25,43 +25,30 @@ ESM-only. Node 20+ is supported.
 ## Quick Example
 
 ```ts
-import { loadClawPDF } from "clawpdf";
+import { openPdf } from "clawpdf";
 
-const library = await loadClawPDF();
+await using pdf = await openPdf("report.pdf");
 
-try {
-  const document = library.loadDocument(pdfBytes);
+console.log(pdf.pageCount);
+console.log(pdf.text({ maxPages: 5 }));
 
-  try {
-    console.log(document.pageCount);
-    console.log(document.extractText({ maxPages: 5 }));
-
-    const page = await document.renderPagePngCompressed(0, {
-      scale: 2,
-      renderForms: true,
-    });
-    await fs.promises.writeFile("page-1.png", page.png);
-  } finally {
-    document.destroy();
-  }
-} finally {
-  library.destroy();
-}
+const png = await pdf.page(1).png({ dpi: 144, forms: true });
+await fs.promises.writeFile("page-1.png", png);
 ```
 
-For server code, keep one `ClawPDF` library alive and reuse it. The top-level
-`extractPdfContent(...)` helper also shares a default library when no `library`
-option is provided.
+For server code, keep one `PdfEngine` alive and reuse it. The top-level
+`extractPdf(...)` helper also shares a default engine when no `engine` option is
+provided.
 
 ## Feature Map
 
-- [Loading PDFs](loading.md) covers library setup, WASM loading, lifetimes, and passwords.
+- [Loading PDFs](loading.md) covers engines, inputs, lifetimes, and passwords.
 - [Text Extraction](text-extraction.md) covers page text and selected-page extraction.
-- [Page Rendering](page-rendering.md) covers RGBA rendering, scale, dimensions, transparency, and form widgets.
-- [PNG Output](png-output.md) covers sync and compressed PNG encoding.
+- [Page Rendering](page-rendering.md) covers DPI, scale, target sizes, backgrounds, and form widgets.
+- [PNG Output](png-output.md) covers page PNGs and standalone encoding.
 - [Extraction Fallback](extraction-fallback.md) covers text-first extraction with image fallback.
 - [Password-Protected PDFs](passwords.md) covers user-password handling.
-- [Browser and Bundlers](browser-bundlers.md) covers `wasmUrl`, `wasmBinary`, and custom instantiation.
+- [Browser and Bundlers](browser-bundlers.md) covers `clawpdf/browser`.
 - [PDFium Provenance](pdfium-provenance.md) covers the vendored binary and refresh workflow.
 - [Package Shape](package-shape.md) covers dependencies and published files.
 - [Performance](performance.md) records the current comparison snapshot.

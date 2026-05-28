@@ -2,9 +2,12 @@
 
 ## Unreleased
 
-- Refactored PDFium lifetime handling so top-level extraction reuses a shared library and `ClawPDF.destroy()` refuses to run while documents are open.
+- Redesigned the public API around `createEngine`, `openPdf`, `extractPdf`, one-based pages, typed errors, raw PNG bytes, and opt-in adapters.
+- Added Node path, URL, and `Blob` input normalization.
+- Added browser and adapter package exports.
+- Refactored PDFium lifetime handling so engine disposal closes open documents and top-level extraction can release its shared engine.
 - Added validation for render and extraction limits before PDFium allocation.
-- Fixed explicit `pageNumbers` extraction so the default page cap no longer truncates the list.
+- Fixed explicit `pages` extraction so the default page cap no longer truncates the list.
 - Increased the PDFium form-fill info buffer used for form rendering.
 - Added password support to the top-level extraction helper.
 - Added a maximum rendered image dimension cap for extraction fallback.

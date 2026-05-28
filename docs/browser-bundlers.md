@@ -5,30 +5,37 @@ description: Load the packaged PDFium WebAssembly binary in browser and bundler 
 
 # Browser and Bundlers
 
-Node can load the packaged WASM file automatically. Browser and bundler setups
-usually need to pass a URL or bytes explicitly.
-
-## URL Loading
+Use `clawpdf/browser` in bundled browser code. It exports the same API as
+`clawpdf` but pre-wires the packaged WASM URL through `import.meta.url`.
 
 ```ts
-const library = await loadClawPDF({
-  wasmUrl: new URL("pdfium.esm.wasm", import.meta.url).href,
+import { openPdf } from "clawpdf/browser";
+
+const pdf = await openPdf(file);
+```
+
+Custom resolution stays available:
+
+```ts
+import { createEngine } from "clawpdf/browser";
+
+const engine = await createEngine({
+  wasmUrl: "/assets/pdfium.esm.wasm",
 });
 ```
 
-The URL is passed to the Emscripten `locateFile` hook.
+## Inputs
 
-## Byte Loading
+Browser inputs:
 
-```ts
-const wasmBinary = await fetch("/assets/pdfium.esm.wasm").then((res) =>
-  res.arrayBuffer(),
-);
+- `Uint8Array`
+- `ArrayBuffer`
+- URL string
+- `URL`
+- `Blob`
 
-const library = await loadClawPDF({ wasmBinary });
-```
-
-Use `wasmBinary` when your bundler or host wants to own the fetch/cache policy.
+Path-like strings throw `PdfFormatError` in browsers because there is no file
+system path to read.
 
 ## Custom Instantiation
 
@@ -36,7 +43,7 @@ Pass `instantiateWasm` when a runtime needs a custom WebAssembly instantiation
 path:
 
 ```ts
-const library = await loadClawPDF({
+const engine = await createEngine({
   instantiateWasm(imports, receiveInstance) {
     // Runtime-specific instantiation hook.
   },

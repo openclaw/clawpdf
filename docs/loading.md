@@ -1,66 +1,71 @@
 ---
 title: Loading PDFs
-description: Create a ClawPDF library handle and load PDF documents from bytes.
+description: Create a ClawPDF engine and load PDF documents.
 ---
 
 # Loading PDFs
 
-Load PDFium once, then load one or more PDF documents from `Uint8Array` or
-`ArrayBuffer` input.
+Use `openPdf(...)` for scripts and one-off work:
 
 ```ts
-import { loadClawPDF } from "clawpdf";
+import { openPdf } from "clawpdf";
 
-const library = await loadClawPDF();
+await using pdf = await openPdf("report.pdf");
+console.log(pdf.pageCount);
+```
 
+Use `createEngine(...)` for servers:
+
+```ts
+import { createEngine } from "clawpdf";
+
+await using engine = await createEngine();
+const pdf = await engine.open(pdfBytes);
 try {
-  const document = library.loadDocument(pdfBytes);
-  try {
-    console.log(document.pageCount);
-  } finally {
-    document.destroy();
-  }
+  console.log(pdf.text());
 } finally {
-  library.destroy();
+  pdf.destroy();
 }
 ```
 
-## Library Lifetime
+## Inputs
 
-`loadClawPDF()` initializes PDFium and returns a `ClawPDF` handle. Call
-`library.destroy()` when the handle is no longer needed.
+Accepted inputs:
 
-Each `library.loadDocument(...)` call returns a `PdfDocument`. Call
-`document.destroy()` after extraction or rendering so PDFium can release document
-memory.
+- `Uint8Array` and `ArrayBuffer`: used directly.
+- Node file path string: read from disk.
+- URL string or `URL`: fetched.
+- `Blob`: read with `arrayBuffer()`.
 
-`library.destroy()` throws while documents opened by that library are still
-alive. Server code should keep one `ClawPDF` library around and reuse it across
-requests instead of loading and destroying PDFium per file.
+In browsers, string inputs must be URLs. Path-like strings throw
+`PdfFormatError`.
 
-For one-shot extraction, `extractPdfContent(...)` uses a shared package-level
-library unless you pass your own `library` option.
+## Lifetime
+
+`openPdf(...)` creates a private engine for the document. Destroying the
+document also destroys that private engine.
+
+`createEngine(...)` returns a long-lived engine you own. `engine.destroy()`
+closes still-open documents before destroying PDFium. Calling `destroy()` twice
+is safe. Calling other methods after destroy throws `PdfDestroyedError`.
 
 ## Passwords
 
-Pass a user password as the second `loadDocument` argument:
+Pass a user password when opening:
 
 ```ts
-const document = library.loadDocument(pdfBytes, "secret");
+const pdf = await openPdf("secret.pdf", { password: "secret" });
 ```
 
-If a PDF requires a password, loading without the right password throws:
-
-```txt
-PDF password is required or incorrect
-```
+Wrong or missing passwords throw `PdfPasswordError`.
 
 ## Load Options
 
-`loadClawPDF(options)` accepts:
+`createEngine(options)` accepts:
 
-- `wasmUrl`: URL or path passed to the Emscripten loader.
+- `wasmUrl`: URL/path passed to the Emscripten loader.
 - `wasmBinary`: raw WASM bytes.
 - `instantiateWasm`: custom Emscripten instantiate hook.
+- `maxRenderPixels`: per-render pixel hard cap.
 
 Node loads the packaged `dist/vendor/pdfium.esm.wasm` automatically.

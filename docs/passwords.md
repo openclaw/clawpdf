@@ -10,19 +10,15 @@ ClawPDF supports encrypted PDFs that PDFium can open with a user password.
 ## Document API
 
 ```ts
-const document = library.loadDocument(pdfBytes, "secret");
+const pdf = await openPdf("secret.pdf", { password: "secret" });
 ```
 
-Wrong or missing passwords throw:
-
-```txt
-PDF password is required or incorrect
-```
+Wrong or missing passwords throw `PdfPasswordError`.
 
 ## Extraction Helper
 
 ```ts
-const result = await extractPdfContent(pdfBytes, {
+const result = await extractPdf("secret.pdf", {
   password: "secret",
   minTextChars: 200,
 });
@@ -33,8 +29,5 @@ document is loaded.
 
 ## Unsupported Security Handlers
 
-PDFium reports unsupported encryption or security handlers as:
-
-```txt
-PDF security handler is unsupported
-```
+PDFium reports unsupported encryption or security handlers as
+`PdfSecurityError`.
