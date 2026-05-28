@@ -16,7 +16,7 @@ const productDescription =
 const installCommand = "npm install clawpdf";
 
 const navSections = [
-  ["Start", ["index.md", "loading.md"]],
+  ["Start", ["index.md", "loading.md", "cli.md"]],
   ["Features", ["text-extraction.md", "page-rendering.md", "png-output.md", "extraction-fallback.md", "passwords.md"]],
   ["Runtime", ["browser-bundlers.md", "pdfium-provenance.md", "package-shape.md"]],
   ["Reference", ["api-reference.md", "performance.md"]],

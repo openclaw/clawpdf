@@ -41,9 +41,18 @@ For server code, keep one `PdfEngine` alive and reuse it. The top-level
 `extractPdf(...)` helper also shares a default engine when no `engine` option is
 provided.
 
+## CLI Example
+
+```bash
+clawpdf report.pdf
+cat report.pdf | clawpdf -
+clawpdf render report.pdf --page 1 > page.png
+```
+
 ## Feature Map
 
 - [Loading PDFs](loading.md) covers engines, inputs, lifetimes, and passwords.
+- [CLI](cli.md) covers shell extraction, JSON output, rendering, and exit codes.
 - [Text Extraction](text-extraction.md) covers page text and selected-page extraction.
 - [Page Rendering](page-rendering.md) covers DPI, scale, target sizes, backgrounds, and form widgets.
 - [PNG Output](png-output.md) covers page PNGs and standalone encoding.
