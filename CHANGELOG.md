@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.0
 
 - Added a zero-dependency `clawpdf` CLI for text extraction, JSON output, stdin input, page rendering, and password-protected PDFs.
