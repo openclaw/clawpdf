@@ -52,7 +52,7 @@
     "vitest": "4.0.14"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "packageManager": "pnpm@11.2.2"
 }

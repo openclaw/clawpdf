@@ -20,7 +20,7 @@ pixel, and dimension budgets.
 npm install clawpdf
 ```
 
-ESM-only. Node 20+ is supported.
+ESM-only. Node 22+ is supported.
 
 ## Quick Example
 

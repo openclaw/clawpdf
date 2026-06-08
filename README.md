@@ -30,7 +30,7 @@ This package currently vendors `pdfium-lib` release `7623`.
 npm install clawpdf
 ```
 
-ESM-only. Node 20+ is supported.
+ESM-only. Node 22+ is supported.
 
 ## Quick Start
 
