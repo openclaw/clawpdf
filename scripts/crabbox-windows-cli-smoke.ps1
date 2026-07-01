@@ -29,7 +29,7 @@ function Invoke-Checked {
 
 Invoke-Checked "node" @("--version")
 Invoke-Checked $npmExe @("--version")
-Invoke-Checked $npmExe @("install", "--prefix", $pnpmPrefix, "pnpm@11.2.2")
+Invoke-Checked $npmExe @("install", "--prefix", $pnpmPrefix, "pnpm@11.9.0")
 
 Invoke-Checked $pnpmExe @("install", "--frozen-lockfile")
 Invoke-Checked $pnpmExe @("typecheck")
