@@ -22,7 +22,7 @@ OpenClaw needs a predictable local PDF path:
 - one dependency with no transitive package tree
 - current vendored PDFium provenance
 
-This package currently vendors `pdfium-lib` release `7623`.
+This package currently vendors `pdfium-lib` release `7902`.
 
 ## Install
 
@@ -204,8 +204,8 @@ Published files:
 
 Current vendored binary:
 
-- `pdfium-lib`: `7623`
-- WASM SHA-256: `14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e`
+- `pdfium-lib`: `7902`
+- WASM SHA-256: `f3fe52ae7f150e912a8379ec4478cac9c11b4135dc56fdc039b0ff885f1c0981`
 
 ## Refresh PDFium
 

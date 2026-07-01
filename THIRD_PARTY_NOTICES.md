@@ -5,9 +5,9 @@
 This package vendors the WebAssembly build from:
 
 - Project: `pdfium-lib`
-- Release: `7623`
+- Release: `7902`
 - Asset: `wasm.tgz`
-- URL: `https://github.com/paulocoutinhox/pdfium-lib/releases/tag/7623`
+- URL: `https://github.com/paulocoutinhox/pdfium-lib/releases/tag/7902`
 
 The upstream PDFium project is developed by Google and used by Chromium.
 
@@ -19,7 +19,7 @@ The canonical upstream license is:
 
 The vendored WASM binary hash in this package is:
 
-`14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e`
+`f3fe52ae7f150e912a8379ec4478cac9c11b4135dc56fdc039b0ff885f1c0981`
 
 ## Emscripten Loader
 

@@ -26,7 +26,7 @@ describe("clawpdf 0.2 API", () => {
     try {
       const pdf = await engine.open(makeTextPdf("Hello ClawPDF"));
       try {
-        expect(PDFIUM_RELEASE).toBe("7623");
+        expect(PDFIUM_RELEASE).toBe("7902");
         expect(pdf.pageCount).toBe(1);
         expect(pdf.page(1).index).toBe(1);
         expect(pdf.page(1).width).toBe(612);

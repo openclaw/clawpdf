@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const release = "7623";
-const assetSha256 = "269f2f8d41661bd5702846edfbca4e4f51e7b46d7ffaa4842d355bf008b3ac2e";
-const wasmSha256 = "14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e";
+const release = "7902";
+const assetSha256 = "153871da7e958a9440c84648eb45ddd9ad603efda9fcd8f021766dba5a9157a2";
+const wasmSha256 = "f3fe52ae7f150e912a8379ec4478cac9c11b4135dc56fdc039b0ff885f1c0981";
 const cache = path.join(root, ".cache");
 const archive = path.join(cache, `pdfium-lib-${release}-wasm.tgz`);
 const extractDir = path.join(cache, `pdfium-lib-${release}`);
