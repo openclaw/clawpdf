@@ -1,5 +1,5 @@
-export const PDFIUM_RELEASE = "7623";
-export const PDFIUM_WASM_SHA256 = "14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e";
+export const PDFIUM_RELEASE = "7902";
+export const PDFIUM_WASM_SHA256 = "f3fe52ae7f150e912a8379ec4478cac9c11b4135dc56fdc039b0ff885f1c0981";
 
 export const PdfErrorCode = {
   Success: 0,

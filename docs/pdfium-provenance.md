@@ -5,12 +5,12 @@ description: Understand the vendored PDFium build and refresh workflow.
 
 # PDFium Provenance
 
-ClawPDF vendors `pdfium-lib` release `7623`.
+ClawPDF vendors `pdfium-lib` release `7902`.
 
 Current vendored WASM SHA-256:
 
 ```txt
-14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e
+f3fe52ae7f150e912a8379ec4478cac9c11b4135dc56fdc039b0ff885f1c0981
 ```
 
 ## Refresh Workflow
