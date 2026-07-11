@@ -7,7 +7,7 @@ onlyBuiltDependencies:
   - esbuild
 allowBuilds:
   esbuild: true
-minimumReleaseAge: 1440
+minimumReleaseAge: 2880
 minimumReleaseAgeExclude:
   - '@typescript/typescript-aix-ppc64@7.0.2'
   - '@typescript/typescript-darwin-arm64@7.0.2'
