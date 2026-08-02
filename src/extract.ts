@@ -159,7 +159,16 @@ function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values)];
 }
 
-function pngDimensions(bytes: Uint8Array): { width: number; height: number } {
+/** Minimum PNG size for IHDR: 8-byte signature + 8-byte chunk header + 13-byte IHDR data. */
+const PNG_IHDR_MIN_BYTES = 24;
+
+/** Read PNG width/height from IHDR. Exported for unit tests. */
+export function pngDimensions(bytes: Uint8Array): { width: number; height: number } {
+  if (bytes.byteLength < PNG_IHDR_MIN_BYTES) {
+    throw new PdfFormatError(
+      `PNG buffer too short to read dimensions: ${bytes.byteLength} bytes (need at least ${PNG_IHDR_MIN_BYTES})`,
+    );
+  }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return {
     width: view.getUint32(16),

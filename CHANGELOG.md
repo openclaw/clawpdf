@@ -5,6 +5,7 @@
 - Reworked the README as a concise entry point to the CLI, library, and reference documentation.
 - Fixed PDFium form-page cleanup when form rendering fails. Thanks @SebTardif.
 - Fixed the npm package to include the PDFium declaration required by TypeScript consumers.
+- Reject short or truncated PNG buffers when reading image dimensions during extraction instead of throwing a raw `RangeError`. Thanks @SebTardif.
 - Updated the vendored PDFium WebAssembly runtime from release `7623` to `7902`.
 - Require Node.js 22 or newer for the npm package, matching the maintained CI matrix.
 

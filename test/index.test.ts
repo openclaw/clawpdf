@@ -20,6 +20,7 @@ import {
 } from "../src/index.js";
 import { toDataUrls, toMessageContent } from "../src/adapters/index.js";
 import { type EngineImpl } from "../src/engine.js";
+import { pngDimensions } from "../src/extract.js";
 
 describe("clawpdf 0.2 API", () => {
   it("opens a PDF and exposes one-based page APIs", async () => {
@@ -284,6 +285,16 @@ describe("clawpdf 0.2 API", () => {
       pdf.destroy();
       await engine.destroy();
     }
+  });
+
+  it("rejects short PNG buffers when reading IHDR dimensions", () => {
+    expect(() => pngDimensions(new Uint8Array(8))).toThrow(PdfFormatError);
+    expect(() => pngDimensions(new Uint8Array(23))).toThrow(PdfFormatError);
+
+    const ihdr = new Uint8Array(24);
+    ihdr[19] = 1; // width = 1 (big-endian at offset 16)
+    ihdr[23] = 2; // height = 2 (big-endian at offset 20)
+    expect(pngDimensions(ihdr)).toEqual({ width: 1, height: 2 });
   });
 
   it("renders PNGs with inline terminal protocols", async () => {
