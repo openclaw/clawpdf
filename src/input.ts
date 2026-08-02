@@ -43,10 +43,21 @@ async function readUrl(url: URL): Promise<Uint8Array> {
   if (!["http:", "https:", "data:"].includes(url.protocol)) {
     throw new PdfFormatError(`Unsupported PDF URL protocol: ${url.protocol}`);
   }
+  // Bound network fetches so a stalled host cannot hang CLI/agent callers forever.
+  const FETCH_TIMEOUT_MS = 30_000;
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new PdfFormatError(
+        `Timed out fetching PDF from ${url.href} after ${FETCH_TIMEOUT_MS}ms`,
+        { cause: error },
+      );
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new PdfFormatError(`Aborted fetching PDF from ${url.href}`, { cause: error });
+    }
     throw new PdfFormatError(`Failed to fetch PDF from ${url.href}`, { cause: error });
   }
   if (!response.ok) {
