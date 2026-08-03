@@ -1,14 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.3.1
 
 - Added portable, cancellable 30-second deadlines for complete remote PDF reads. Thanks @SebTardif.
-- Reworked the README as a concise entry point to the CLI, library, and reference documentation.
-- Fixed PDFium form-page cleanup when form rendering fails. Thanks @SebTardif.
 - Fixed the npm package to include the PDFium declaration required by TypeScript consumers.
-- Fixed extraction bookkeeping to use planned render dimensions instead of reparsing generated PNG bytes. Thanks @SebTardif.
+- Required Node.js 22 or newer for the npm package, matching the maintained CI matrix.
 - Updated the vendored PDFium WebAssembly runtime from release `7623` to `7902`.
-- Require Node.js 22 or newer for the npm package, matching the maintained CI matrix.
+- Fixed PDFium form-page cleanup when form rendering fails. Thanks @SebTardif.
+- Fixed extraction bookkeeping to use planned render dimensions instead of reparsing generated PNG bytes. Thanks @SebTardif.
+- Reworked the README as a concise entry point to the CLI, library, and reference documentation.
 
 ## 0.3.0
 
