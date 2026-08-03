@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const root = process.cwd();
-const temp = mkdtempSync(join(tmpdir(), "clawpdf-cli-e2e-"));
+const temp = mkdtempSync(join(tmpdir(), "clawpdf-package-e2e-"));
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -26,6 +26,51 @@ try {
   const appDir = join(temp, "app");
   mkdirSync(appDir);
   run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(temp, tarball)], {
+    cwd: appDir,
+    stdio: "pipe",
+  });
+
+  const installedPackage = join(appDir, "node_modules", "clawpdf");
+  const installedManifest = JSON.parse(readFileSync(join(installedPackage, "package.json"), "utf8"));
+  assert(installedManifest.engines?.node === ">=22", "packed package must require Node.js 22 or newer");
+  assert(
+    existsSync(join(installedPackage, "dist", "vendor", "pdfium.esm.d.ts")),
+    "packed package is missing the PDFium declaration",
+  );
+
+  const consumerSource = join(appDir, "consumer.ts");
+  const consumerConfig = join(appDir, "tsconfig.json");
+  writeFileSync(
+    consumerSource,
+    [
+      'import { createEngine, type PdfEngine } from "clawpdf";',
+      "",
+      "export async function loadEngine(): Promise<PdfEngine> {",
+      "  return createEngine();",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    consumerConfig,
+    JSON.stringify(
+      {
+        compilerOptions: {
+          lib: ["ES2022", "DOM", "ESNext.Disposable"],
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          noEmit: true,
+          skipLibCheck: false,
+          strict: true,
+          target: "ES2022",
+        },
+        files: ["consumer.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  run(process.execPath, [join(root, "node_modules", "typescript", "bin", "tsc"), "--project", consumerConfig], {
     cwd: appDir,
     stdio: "pipe",
   });

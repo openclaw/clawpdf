@@ -24,6 +24,7 @@ Published files:
 - `dist/browser.d.ts`
 - `dist/adapters/index.js`
 - `dist/adapters/index.d.ts`
+- `dist/vendor/pdfium.esm.d.ts`
 - `dist/vendor/pdfium.esm.js`
 - `dist/vendor/pdfium.esm.wasm`
 - `CHANGELOG.md`

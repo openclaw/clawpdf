@@ -43,7 +43,7 @@
     "download:pdfium": "node scripts/download-pdfium.mjs",
     "prepack": "pnpm build",
     "test": "pnpm build && vitest run",
-    "test:cli": "pnpm build && node scripts/test-cli-e2e.mjs",
+    "test:package": "pnpm build && node scripts/test-package-e2e.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
