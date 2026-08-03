@@ -19,6 +19,7 @@ import {
   resolveInlineImageProtocol,
 } from "../src/index.js";
 import { toDataUrls, toMessageContent } from "../src/adapters/index.js";
+import { withFormPageLifecycle } from "../src/document.js";
 
 describe("clawpdf 0.2 API", () => {
   it("opens a PDF and exposes one-based page APIs", async () => {
@@ -238,6 +239,29 @@ describe("clawpdf 0.2 API", () => {
 
     expect(() => encodePng(new Uint8Array(), { width: 0, height: 1, compress: false })).toThrow(PdfFormatError);
     expect(() => encodePng(new Uint8Array(3), { width: 1, height: 1, compress: false })).toThrow(PdfFormatError);
+  });
+
+  it("closes form pages when draw throws after AfterLoad", () => {
+    const events: string[] = [];
+    expect(() =>
+      withFormPageLifecycle({
+        afterLoad: () => events.push("after"),
+        draw: () => {
+          events.push("draw");
+          throw new Error("draw failed");
+        },
+        beforeClose: () => events.push("beforeClose"),
+      }),
+    ).toThrow("draw failed");
+    expect(events).toEqual(["after", "draw", "beforeClose"]);
+
+    events.length = 0;
+    withFormPageLifecycle({
+      afterLoad: () => events.push("after"),
+      draw: () => events.push("draw"),
+      beforeClose: () => events.push("beforeClose"),
+    });
+    expect(events).toEqual(["after", "draw", "beforeClose"]);
   });
 
   it("renders PNGs with inline terminal protocols", async () => {
