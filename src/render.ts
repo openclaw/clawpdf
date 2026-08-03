@@ -70,7 +70,7 @@ export function planImageRender(
   requestedScale: number,
   remainingPixels: number,
   maxDimension: number,
-): { scale: number; capped: boolean } | null {
+): { scale: number; width: number; height: number; capped: boolean } | null {
   if (pageWidth <= 0 || pageHeight <= 0 || remainingPixels <= 0) {
     return null;
   }
@@ -87,7 +87,7 @@ export function planImageRender(
   }
   const capped = maxScale < requestedScale - 1e-9;
 
-  let best: { scale: number } | null = null;
+  let best: { scale: number; width: number; height: number } | null = null;
   let low = 0;
   let high = maxScale;
   for (let i = 0; i < 32; i += 1) {
@@ -95,13 +95,13 @@ export function planImageRender(
     const width = Math.max(1, Math.ceil(pageWidth * scale));
     const height = Math.max(1, Math.ceil(pageHeight * scale));
     if (width <= dimensionLimit && height <= dimensionLimit && width * height <= pixelLimit) {
-      best = { scale };
+      best = { scale, width, height };
       low = scale;
     } else {
       high = scale;
     }
   }
-  return best ? { scale: best.scale, capped } : null;
+  return best ? { ...best, capped } : null;
 }
 
 export function positiveInteger(name: string, value: number): number {

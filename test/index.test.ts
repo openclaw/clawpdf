@@ -20,7 +20,6 @@ import {
 } from "../src/index.js";
 import { toDataUrls, toMessageContent } from "../src/adapters/index.js";
 import { type EngineImpl } from "../src/engine.js";
-import { pngDimensions } from "../src/extract.js";
 
 describe("clawpdf 0.2 API", () => {
   it("opens a PDF and exposes one-based page APIs", async () => {
@@ -83,6 +82,8 @@ describe("clawpdf 0.2 API", () => {
     expect(result.text).toContain("First page");
     expect(result.pagesProcessed).toEqual([3, 1]);
     expect(result.images.map((image) => image.page)).toEqual([3, 1]);
+    expect(result.images.map((image) => ({ width: image.width, height: image.height })))
+      .toEqual(result.images.map((image) => readPngDimensions(image.bytes)));
     expect(result.images[0]?.bytes.subarray(0, 8)).toEqual(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]));
     expect(result.images[0]?.mimeType).toBe("image/png");
     expect(result.truncated.images).toBe(true);
@@ -287,14 +288,18 @@ describe("clawpdf 0.2 API", () => {
     }
   });
 
-  it("rejects short PNG buffers when reading IHDR dimensions", () => {
-    expect(() => pngDimensions(new Uint8Array(8))).toThrow(PdfFormatError);
-    expect(() => pngDimensions(new Uint8Array(23))).toThrow(PdfFormatError);
+  it("keeps planned extraction dimensions in sync with rendered PNGs", async () => {
+    const result = await extractPdf(makeTextPdf(["", ""], { width: 101, height: 53 }), {
+      mode: "images",
+      image: { scale: 0.5, maxDimension: 25, maxPixels: 700 },
+    });
 
-    const ihdr = new Uint8Array(24);
-    ihdr[19] = 1; // width = 1 (big-endian at offset 16)
-    ihdr[23] = 2; // height = 2 (big-endian at offset 20)
-    expect(pngDimensions(ihdr)).toEqual({ width: 1, height: 2 });
+    expect(result.images).toHaveLength(2);
+    expect(result.images.map((image) => ({ width: image.width, height: image.height })))
+      .toEqual([{ width: 25, height: 14 }, { width: 25, height: 14 }]);
+    expect(result.images.map((image) => readPngDimensions(image.bytes)))
+      .toEqual([{ width: 25, height: 14 }, { width: 25, height: 14 }]);
+    expect(result.images.reduce((pixels, image) => pixels + image.width * image.height, 0)).toBe(700);
   });
 
   it("renders PNGs with inline terminal protocols", async () => {
@@ -343,6 +348,12 @@ function fakeStdout(isTTY = true): NodeJS.WritableStream & { output: string; col
       return true;
     },
   } as NodeJS.WritableStream & { output: string; columns: number; isTTY: boolean };
+}
+
+function readPngDimensions(bytes: Uint8Array): { width: number; height: number } {
+  expect(bytes.subarray(0, 8)).toEqual(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
 function makeTextPdf(text: string | string[], options: { width?: number; height?: number; rotate?: 0 | 90 | 180 | 270 } = {}): Uint8Array {

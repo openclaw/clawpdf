@@ -123,15 +123,14 @@ async function renderImages(
       scale: plan.scale,
       forms: image.forms ?? true,
     });
-    const dimensions = pngDimensions(bytes);
     images.push({
       page: pageNumber,
-      width: dimensions.width,
-      height: dimensions.height,
+      width: plan.width,
+      height: plan.height,
       bytes,
       mimeType: "image/png",
     });
-    remainingPixels -= dimensions.width * dimensions.height;
+    remainingPixels -= plan.width * plan.height;
   }
 
   if (images.length < pages.length) {
@@ -157,21 +156,4 @@ function documentPages(document: PdfDocument, options: Pick<ExtractOptions, "pag
 
 function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values)];
-}
-
-/** Minimum PNG size for IHDR: 8-byte signature + 8-byte chunk header + 13-byte IHDR data. */
-const PNG_IHDR_MIN_BYTES = 24;
-
-/** Read PNG width/height from IHDR. Exported for unit tests. */
-export function pngDimensions(bytes: Uint8Array): { width: number; height: number } {
-  if (bytes.byteLength < PNG_IHDR_MIN_BYTES) {
-    throw new PdfFormatError(
-      `PNG buffer too short to read dimensions: ${bytes.byteLength} bytes (need at least ${PNG_IHDR_MIN_BYTES})`,
-    );
-  }
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return {
-    width: view.getUint32(16),
-    height: view.getUint32(20),
-  };
 }
