@@ -42,6 +42,13 @@ Missing files throw `PdfFormatError` with the original error as `cause`.
 In browsers, string inputs must parse as URLs. Path-like strings throw
 `PdfFormatError`.
 
+Remote URL options accepted by `openPdf`, `engine.open`, `extractPdf`, and
+`engine.extract`:
+
+- `fetchTimeoutMs?: number`: total HTTP(S) response deadline, default `30000`;
+  use `0` to disable it.
+- `signal?: AbortSignal`: caller-controlled cancellation.
+
 ## `createEngine(options?)`
 
 Returns `Promise<PdfEngine>`.
@@ -76,6 +83,8 @@ console.log(pdf.text());
 Options:
 
 - `password?: string`
+- `fetchTimeoutMs?: number`
+- `signal?: AbortSignal`
 
 ## `PdfDocument`
 
@@ -109,6 +118,8 @@ Options:
 
 - `mode?: "auto" | "text" | "images" | "both"`
 - `password?: string`
+- `fetchTimeoutMs?: number`
+- `signal?: AbortSignal`
 - `pages?: number[]`
 - `maxPages?: number`, applied to explicit `pages` only when provided
 - `minTextChars?: number`

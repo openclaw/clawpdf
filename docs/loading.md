@@ -40,6 +40,18 @@ Accepted inputs:
 In browsers, string inputs must be URLs. Path-like strings throw
 `PdfFormatError`.
 
+HTTP and HTTPS reads have a 30-second deadline covering both response headers
+and the complete response body. Override it per call with `fetchTimeoutMs`, use
+`0` to disable the deadline, or pass an `AbortSignal` as `signal` for caller
+cancellation:
+
+```ts
+await using pdf = await openPdf(url, {
+  fetchTimeoutMs: 10_000,
+  signal: controller.signal,
+});
+```
+
 ## Lifetime
 
 `openPdf(...)` creates a private engine for the document. Destroying the

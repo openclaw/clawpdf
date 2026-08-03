@@ -8,7 +8,7 @@ import {
   PdfSecurityError,
 } from "./errors.js";
 import { type ExtractOptions, extractDocument } from "./extract.js";
-import { type PdfInput, normalizePdfInput } from "./input.js";
+import { type PdfInput, type PdfInputOptions, normalizePdfInput } from "./input.js";
 import { positiveInteger } from "./render.js";
 
 export type EngineOptions = {
@@ -18,7 +18,7 @@ export type EngineOptions = {
   maxRenderPixels?: number;
 };
 
-export type OpenPdfOptions = {
+export type OpenPdfOptions = PdfInputOptions & {
   password?: string;
 };
 
@@ -85,7 +85,16 @@ export class EngineImpl implements PdfEngine {
   }
 
   async extract(input: PdfInput, options: ExtractOptions = {}): Promise<ExtractResult> {
-    const openOptions = options.password === undefined ? {} : { password: options.password };
+    const openOptions: OpenPdfOptions = {};
+    if (options.password !== undefined) {
+      openOptions.password = options.password;
+    }
+    if (options.signal !== undefined) {
+      openOptions.signal = options.signal;
+    }
+    if (options.fetchTimeoutMs !== undefined) {
+      openOptions.fetchTimeoutMs = options.fetchTimeoutMs;
+    }
     const document = await this.open(input, openOptions);
     try {
       return await extractDocument(document as DocumentImpl, options);
@@ -123,7 +132,7 @@ export class EngineImpl implements PdfEngine {
     onDestroy?: DocumentDestroyHook,
   ): Promise<PdfDocument> {
     this.assertLive();
-    const bytes = await normalizePdfInput(input);
+    const bytes = await normalizePdfInput(input, options);
     this.assertLive();
     const documentPtr = this.malloc(bytes.byteLength);
     this.module.HEAPU8.set(bytes, documentPtr);

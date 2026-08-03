@@ -1,12 +1,12 @@
 import { type DocumentImpl, type PdfDocument, type TextOptions } from "./document.js";
 import { type PdfEngine } from "./engine.js";
-import { type PdfInput } from "./input.js";
+import { type PdfInput, type PdfInputOptions } from "./input.js";
 import { PdfFormatError } from "./errors.js";
 import { planImageRender, positiveFiniteNumber, positiveInteger } from "./render.js";
 
 export type ExtractMode = "auto" | "text" | "images" | "both";
 
-export type ExtractOptions = {
+export type ExtractOptions = PdfInputOptions & {
   mode?: ExtractMode;
   password?: string;
   pages?: number[];

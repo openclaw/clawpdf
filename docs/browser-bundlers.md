@@ -38,6 +38,10 @@ Browser inputs:
 Path-like strings throw `PdfFormatError` in browsers because there is no file
 system path to read.
 
+Remote reads use the same 30-second default deadline as Node. Pass
+`fetchTimeoutMs` or `signal` to `openPdf` and `extractPdf` to customize or
+cancel a request without relying on `AbortSignal.timeout` support.
+
 ## Custom Instantiation
 
 Pass `instantiateWasm` when a runtime needs a custom WebAssembly instantiation

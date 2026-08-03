@@ -1,4 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { type AddressInfo, type Socket } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
@@ -66,6 +68,50 @@ describe("clawpdf 0.2 API", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("bounds remote PDF reads across headers and response bodies", async () => {
+    const bytes = makeTextPdf("Network input");
+    await withPdfServer(bytes, async (baseUrl) => {
+      const engine = await createEngine();
+      try {
+        await using pdf = await engine.open(`${baseUrl}/ok`, { fetchTimeoutMs: 1_000 });
+        expect(pdf.text()).toContain("Network input");
+
+        await expect(engine.open(`${baseUrl}/stall-headers`, { fetchTimeoutMs: 50 }))
+          .rejects.toThrow("Timed out fetching PDF");
+        await expect(engine.open(`${baseUrl}/stall-body`, { fetchTimeoutMs: 50 }))
+          .rejects.toThrow("Timed out fetching PDF");
+        await expect(extractPdf(`${baseUrl}/stall-body`, { fetchTimeoutMs: 50 }))
+          .rejects.toThrow("Timed out fetching PDF");
+      } finally {
+        await releaseExtractEngine();
+        await engine.destroy();
+      }
+    });
+  });
+
+  it("supports caller cancellation and validates remote fetch timeouts", async () => {
+    const bytes = makeTextPdf("Abort input");
+    await withPdfServer(bytes, async (baseUrl) => {
+      const engine = await createEngine();
+      try {
+        const controller = new AbortController();
+        const opening = engine.open(`${baseUrl}/stall-headers`, {
+          signal: controller.signal,
+          fetchTimeoutMs: 1_000,
+        });
+        controller.abort();
+        await expect(opening).rejects.toThrow("Aborted fetching PDF");
+        await expect(engine.open(`${baseUrl}/ok`, { fetchTimeoutMs: -1 }))
+          .rejects.toThrow("fetchTimeoutMs must be an integer");
+
+        await using noDeadline = await engine.open(`${baseUrl}/ok`, { fetchTimeoutMs: 0 });
+        expect(noDeadline.text()).toContain("Abort input");
+      } finally {
+        await engine.destroy();
+      }
+    });
   });
 
   it("extracts selected pages with raw image bytes and adapter output", async () => {
@@ -354,6 +400,40 @@ function readPngDimensions(bytes: Uint8Array): { width: number; height: number }
   expect(bytes.subarray(0, 8)).toEqual(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]));
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return { width: view.getUint32(16), height: view.getUint32(20) };
+}
+
+async function withPdfServer(bytes: Uint8Array, run: (baseUrl: string) => Promise<void>): Promise<void> {
+  const sockets = new Set<Socket>();
+  const server = createServer((request, response) => {
+    if (request.url === "/ok") {
+      response.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": bytes.byteLength });
+      response.end(bytes);
+      return;
+    }
+    if (request.url === "/stall-body") {
+      response.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": bytes.byteLength + 1 });
+      response.write(bytes.subarray(0, 8));
+      return;
+    }
+    if (request.url !== "/stall-headers") {
+      response.writeHead(404).end();
+    }
+  });
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.listen(0, "127.0.0.1", resolve);
+    server.once("error", reject);
+  });
+  const address = server.address() as AddressInfo;
+  try {
+    await run(`http://127.0.0.1:${address.port}`);
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 }
 
 function makeTextPdf(text: string | string[], options: { width?: number; height?: number; rotate?: 0 | 90 | 180 | 270 } = {}): Uint8Array {
