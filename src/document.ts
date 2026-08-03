@@ -234,9 +234,12 @@ export class DocumentImpl implements PdfDocument {
         if (options.forms === true) {
           const formHandle = this.ensureFormHandle();
           this.engine.module._FORM_OnAfterLoadPage(page, formHandle);
-          flags &= ~RenderFlag.Annot;
-          this.engine.module._FPDF_FFLDraw(formHandle, bitmap, page, 0, 0, size.width, size.height, size.rotate, flags);
-          this.engine.module._FORM_OnBeforeClosePage(page, formHandle);
+          try {
+            flags &= ~RenderFlag.Annot;
+            this.engine.module._FPDF_FFLDraw(formHandle, bitmap, page, 0, 0, size.width, size.height, size.rotate, flags);
+          } finally {
+            this.engine.module._FORM_OnBeforeClosePage(page, formHandle);
+          }
         }
 
         return {
