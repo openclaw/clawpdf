@@ -43,10 +43,14 @@ try {
   writeFileSync(
     consumerSource,
     [
-      'import { createEngine, type PdfEngine } from "clawpdf";',
+      'import { createEngine, openPdf, type PdfEngine } from "clawpdf";',
       "",
       "export async function loadEngine(): Promise<PdfEngine> {",
       "  return createEngine();",
+      "}",
+      "",
+      "export function loadRemote(url: URL, signal: AbortSignal) {",
+      "  return openPdf(url, { fetchTimeoutMs: 10_000, signal });",
       "}",
       "",
     ].join("\n"),

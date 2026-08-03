@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added portable, cancellable 30-second deadlines for complete remote PDF reads. Thanks @SebTardif.
 - Reworked the README as a concise entry point to the CLI, library, and reference documentation.
 - Fixed PDFium form-page cleanup when form rendering fails. Thanks @SebTardif.
 - Fixed the npm package to include the PDFium declaration required by TypeScript consumers.

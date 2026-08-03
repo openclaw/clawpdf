@@ -2,7 +2,12 @@ import { PdfFormatError } from "./errors.js";
 
 export type PdfInput = Uint8Array | ArrayBuffer | string | URL | Blob;
 
-export async function normalizePdfInput(input: PdfInput): Promise<Uint8Array> {
+export type PdfInputOptions = {
+  signal?: AbortSignal;
+  fetchTimeoutMs?: number;
+};
+
+export async function normalizePdfInput(input: PdfInput, options: PdfInputOptions = {}): Promise<Uint8Array> {
   if (input instanceof Uint8Array) {
     return input;
   }
@@ -13,18 +18,18 @@ export async function normalizePdfInput(input: PdfInput): Promise<Uint8Array> {
     return new Uint8Array(await input.arrayBuffer());
   }
   if (input instanceof URL) {
-    return readUrl(input);
+    return readUrl(input, options);
   }
   if (typeof input === "string") {
-    return readStringInput(input);
+    return readStringInput(input, options);
   }
   throw new PdfFormatError("Unsupported PDF input type");
 }
 
-async function readStringInput(input: string): Promise<Uint8Array> {
+async function readStringInput(input: string, options: PdfInputOptions): Promise<Uint8Array> {
   const url = parseAbsoluteUrl(input);
   if (url && isSupportedUrlProtocol(url.protocol)) {
-    return readUrl(url);
+    return readUrl(url, options);
   }
   if (url && !isNodeRuntime()) {
     throw new PdfFormatError(`Unsupported PDF URL protocol: ${url.protocol}`);
@@ -35,7 +40,10 @@ async function readStringInput(input: string): Promise<Uint8Array> {
   return readNodeFile(input);
 }
 
-async function readUrl(url: URL): Promise<Uint8Array> {
+const defaultFetchTimeoutMs = 30_000;
+const maxTimerMs = 2_147_483_647;
+
+async function readUrl(url: URL, options: PdfInputOptions): Promise<Uint8Array> {
   if (url.protocol === "file:" && isNodeRuntime()) {
     const { fileURLToPath } = await import("node:url");
     return readNodeFile(fileURLToPath(url));
@@ -43,27 +51,62 @@ async function readUrl(url: URL): Promise<Uint8Array> {
   if (!["http:", "https:", "data:"].includes(url.protocol)) {
     throw new PdfFormatError(`Unsupported PDF URL protocol: ${url.protocol}`);
   }
-  // Bound network fetches so a stalled host cannot hang CLI/agent callers forever.
-  const FETCH_TIMEOUT_MS = 30_000;
-  let response: Response;
+  const timeoutMs = resolveFetchTimeout(options.fetchTimeoutMs);
+  const controller = new AbortController();
+  let timedOut = false;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const abortFromCaller = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) {
+    abortFromCaller();
+  } else {
+    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
+  if (timeoutMs > 0 && !controller.signal.aborted) {
+    timeout = setTimeout(() => {
+      if (controller.signal.aborted) {
+        return;
+      }
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+  }
+
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new PdfFormatError(`Failed to fetch PDF from ${url.href}: ${response.status} ${response.statusText}`);
+    }
+    return new Uint8Array(await response.arrayBuffer());
   } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") {
+    if (error instanceof PdfFormatError) {
+      throw error;
+    }
+    if (timedOut) {
       throw new PdfFormatError(
-        `Timed out fetching PDF from ${url.href} after ${FETCH_TIMEOUT_MS}ms`,
+        `Timed out fetching PDF from ${url.href} after ${timeoutMs}ms`,
         { cause: error },
       );
     }
-    if (error instanceof Error && error.name === "AbortError") {
+    if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
       throw new PdfFormatError(`Aborted fetching PDF from ${url.href}`, { cause: error });
     }
     throw new PdfFormatError(`Failed to fetch PDF from ${url.href}`, { cause: error });
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+    options.signal?.removeEventListener("abort", abortFromCaller);
   }
-  if (!response.ok) {
-    throw new PdfFormatError(`Failed to fetch PDF from ${url.href}: ${response.status} ${response.statusText}`);
+}
+
+function resolveFetchTimeout(value: number | undefined): number {
+  if (value === undefined) {
+    return defaultFetchTimeoutMs;
   }
-  return new Uint8Array(await response.arrayBuffer());
+  if (!Number.isSafeInteger(value) || value < 0 || value > maxTimerMs) {
+    throw new PdfFormatError(`fetchTimeoutMs must be an integer between 0 and ${maxTimerMs}`);
+  }
+  return value;
 }
 
 function isSupportedUrlProtocol(protocol: string): boolean {
