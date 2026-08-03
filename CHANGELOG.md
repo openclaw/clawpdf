@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reworked the README as a concise entry point to the CLI, library, and reference documentation.
 - Updated the vendored PDFium WebAssembly runtime from release `7623` to `7902`.
 - Require Node.js 22 or newer for the npm package, matching the maintained CI matrix.
 
