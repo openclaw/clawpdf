@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.1
 
 - Added portable, cancellable 30-second deadlines for complete remote PDF reads. Thanks @SebTardif.
