@@ -33,6 +33,6 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm test:cli
+      - run: pnpm test:package
       - run: pnpm docs:site
       - run: pnpm pack --dry-run

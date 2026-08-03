@@ -33,4 +33,4 @@ Invoke-Checked $npmExe @("install", "--prefix", $pnpmPrefix, "pnpm@11.9.0")
 
 Invoke-Checked $pnpmExe @("install", "--frozen-lockfile")
 Invoke-Checked $pnpmExe @("typecheck")
-Invoke-Checked $pnpmExe @("test:cli")
+Invoke-Checked $pnpmExe @("test:package")

@@ -111,7 +111,7 @@ pnpm install
 pnpm build
 pnpm typecheck
 pnpm test
-pnpm test:cli
+pnpm test:package
 pnpm docs:site
 ```
 
