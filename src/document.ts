@@ -233,25 +233,13 @@ export class DocumentImpl implements PdfDocument {
 
         if (options.forms === true) {
           const formHandle = this.ensureFormHandle();
-          // AfterLoad pairs with BeforeClose; FFLDraw can throw (budget/abort/native).
-          withFormPageLifecycle({
-            afterLoad: () => this.engine.module._FORM_OnAfterLoadPage(page, formHandle),
-            draw: () => {
-              flags &= ~RenderFlag.Annot;
-              this.engine.module._FPDF_FFLDraw(
-                formHandle,
-                bitmap,
-                page,
-                0,
-                0,
-                size.width,
-                size.height,
-                size.rotate,
-                flags,
-              );
-            },
-            beforeClose: () => this.engine.module._FORM_OnBeforeClosePage(page, formHandle),
-          });
+          this.engine.module._FORM_OnAfterLoadPage(page, formHandle);
+          try {
+            flags &= ~RenderFlag.Annot;
+            this.engine.module._FPDF_FFLDraw(formHandle, bitmap, page, 0, 0, size.width, size.height, size.rotate, flags);
+          } finally {
+            this.engine.module._FORM_OnBeforeClosePage(page, formHandle);
+          }
         }
 
         return {
@@ -343,23 +331,6 @@ export class DocumentImpl implements PdfDocument {
     } finally {
       this.engine.module.wasmExports.free(tagPtr);
     }
-  }
-}
-
-/**
- * Pair FORM_OnAfterLoadPage with FORM_OnBeforeClosePage even when draw throws.
- * Exported for unit tests.
- */
-export function withFormPageLifecycle(hooks: {
-  afterLoad: () => void;
-  draw: () => void;
-  beforeClose: () => void;
-}): void {
-  hooks.afterLoad();
-  try {
-    hooks.draw();
-  } finally {
-    hooks.beforeClose();
   }
 }
 

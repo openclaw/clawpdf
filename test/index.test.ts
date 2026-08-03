@@ -19,7 +19,7 @@ import {
   resolveInlineImageProtocol,
 } from "../src/index.js";
 import { toDataUrls, toMessageContent } from "../src/adapters/index.js";
-import { withFormPageLifecycle } from "../src/document.js";
+import { type EngineImpl } from "../src/engine.js";
 
 describe("clawpdf 0.2 API", () => {
   it("opens a PDF and exposes one-based page APIs", async () => {
@@ -241,27 +241,49 @@ describe("clawpdf 0.2 API", () => {
     expect(() => encodePng(new Uint8Array(3), { width: 1, height: 1, compress: false })).toThrow(PdfFormatError);
   });
 
-  it("closes form pages when draw throws after AfterLoad", () => {
+  it("closes form pages and render resources when form drawing throws", async () => {
+    const engine = await createEngine() as EngineImpl;
+    const pdf = await engine.open(makeTextPdf("Forms"));
+    const module = engine.module;
     const events: string[] = [];
-    expect(() =>
-      withFormPageLifecycle({
-        afterLoad: () => events.push("after"),
-        draw: () => {
-          events.push("draw");
-          throw new Error("draw failed");
-        },
-        beforeClose: () => events.push("beforeClose"),
-      }),
-    ).toThrow("draw failed");
-    expect(events).toEqual(["after", "draw", "beforeClose"]);
+    const originalAfterLoad = module._FORM_OnAfterLoadPage;
+    const originalDraw = module._FPDF_FFLDraw;
+    const originalBeforeClose = module._FORM_OnBeforeClosePage;
+    const originalDestroyBitmap = module._FPDFBitmap_Destroy;
+    const originalClosePage = module._FPDF_ClosePage;
+    try {
+      module._FORM_OnAfterLoadPage = (...args) => {
+        events.push("afterLoad");
+        originalAfterLoad(...args);
+      };
+      module._FPDF_FFLDraw = () => {
+        events.push("draw");
+        throw new Error("draw failed");
+      };
+      module._FORM_OnBeforeClosePage = (...args) => {
+        events.push("beforeClose");
+        originalBeforeClose(...args);
+      };
+      module._FPDFBitmap_Destroy = (...args) => {
+        events.push("destroyBitmap");
+        originalDestroyBitmap(...args);
+      };
+      module._FPDF_ClosePage = (...args) => {
+        events.push("closePage");
+        originalClosePage(...args);
+      };
 
-    events.length = 0;
-    withFormPageLifecycle({
-      afterLoad: () => events.push("after"),
-      draw: () => events.push("draw"),
-      beforeClose: () => events.push("beforeClose"),
-    });
-    expect(events).toEqual(["after", "draw", "beforeClose"]);
+      expect(() => pdf.page(1).render({ forms: true, width: 8 })).toThrow("draw failed");
+      expect(events).toEqual(["afterLoad", "draw", "beforeClose", "destroyBitmap", "closePage"]);
+    } finally {
+      module._FORM_OnAfterLoadPage = originalAfterLoad;
+      module._FPDF_FFLDraw = originalDraw;
+      module._FORM_OnBeforeClosePage = originalBeforeClose;
+      module._FPDFBitmap_Destroy = originalDestroyBitmap;
+      module._FPDF_ClosePage = originalClosePage;
+      pdf.destroy();
+      await engine.destroy();
+    }
   });
 
   it("renders PNGs with inline terminal protocols", async () => {
