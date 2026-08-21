@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Hardened CI and developer tooling against excess token permissions, Windows shell interpolation, and docs-heading sanitizer bypasses.
+
 ## 0.3.1
 
 - Added portable, cancellable 30-second deadlines for complete remote PDF reads. Thanks @SebTardif.
