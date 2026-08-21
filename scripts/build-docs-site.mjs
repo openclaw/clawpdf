@@ -33,8 +33,8 @@ const orderedPages = navSections.flatMap(([, rels]) => rels.map((rel) => pageMap
 const sectionByRel = new Map(navSections.flatMap(([section, rels]) => rels.map((rel) => [rel, section])));
 
 for (const page of pages) {
-  const html = markdownToHtml(page.body, page.rel);
-  const toc = tocFromHtml(html);
+  const { html, headings } = markdownToHtml(page.body, page.rel);
+  const toc = tocFromHeadings(headings);
   const index = orderedPages.findIndex((candidate) => candidate.rel === page.rel);
   const prev = index > 0 ? orderedPages[index - 1] : null;
   const next = index >= 0 && index < orderedPages.length - 1 ? orderedPages[index + 1] : null;
@@ -238,6 +238,7 @@ function pagerHtml(prev, next) {
 function markdownToHtml(markdown, fromRel) {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const out = [];
+  const headings = [];
   let paragraph = [];
   let list = null;
   let blockquote = [];
@@ -292,6 +293,9 @@ function markdownToHtml(markdown, fromRel) {
       const level = heading[1].length;
       const text = heading[2].trim();
       const id = slugify(text);
+      if (level === 2 || level === 3) {
+        headings.push({ level, id, title: inlineText(text) });
+      }
       out.push(`<h${level} id="${id}"><a class="anchor" href="#${id}" aria-label="Link to ${escapeHtml(text)}">#</a>${inlineMarkdown(text, fromRel)}</h${level}>`);
       continue;
     }
@@ -335,7 +339,7 @@ function markdownToHtml(markdown, fromRel) {
 
   if (code) out.push(codeBlock(code.lang, code.lines.join("\n")));
   flushLoose();
-  return out.join("\n");
+  return { html: out.join("\n"), headings };
 }
 
 function codeBlock(lang, source) {
@@ -424,6 +428,12 @@ function inlineMarkdown(text, fromRel) {
   return escaped.replace(/\u0000CODE(\d+)\u0000/g, (_, index) => codeSpans[Number(index)]);
 }
 
+function inlineText(text) {
+  return text
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+}
+
 function resolveHref(href, fromRel) {
   if (/^(?:https?:|mailto:|#)/.test(href)) return href;
   if (href.endsWith(".md")) return href.replace(/\.md$/, ".html");
@@ -431,12 +441,7 @@ function resolveHref(href, fromRel) {
   return href;
 }
 
-function tocFromHtml(html) {
-  const items = [...html.matchAll(/<h([23]) id="([^"]+)">.*?<\/h\1>/g)].map((match) => ({
-    level: Number(match[1]),
-    id: match[2],
-    title: stripTags(match[0]).replace(/^#/, ""),
-  }));
+function tocFromHeadings(items) {
   if (!items.length) return "<p>No sections.</p>";
   return `<ol>${items.map((item) => `<li class="toc-l${item.level}"><a href="#${item.id}">${escapeHtml(item.title)}</a></li>`).join("")}</ol>`;
 }
@@ -484,10 +489,6 @@ function slugify(value) {
     .replace(/`([^`]+)`/g, "$1")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-function stripTags(value) {
-  return value.replace(/<[^>]+>/g, "");
 }
 
 function escapeHtml(value) {
