@@ -1,12 +1,7 @@
 packages:
   - .
 overrides:
-  esbuild: 0.28.1
-  vite: 7.3.6
-onlyBuiltDependencies:
-  - esbuild
-allowBuilds:
-  esbuild: true
+  vite: 8.2.2
 minimumReleaseAge: 2880
 minimumReleaseAgeExclude:
   - '@typescript/typescript-aix-ppc64@7.0.2'
