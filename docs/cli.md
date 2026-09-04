@@ -68,6 +68,7 @@ instead of writing binary PNG bytes to stdout.
 - `--max-pixels` and `--max-dimension` bound fallback image output.
 - `--forms` and `--no-forms` control form rendering.
 - `--password <value>` or `--password-file <path>` opens encrypted PDFs.
+- `--fetch-max-bytes <n>` sets the HTTP(S) response-body budget for extraction and rendering (default: `100000000`, or 100 MB). Use a larger non-negative integer for large remote PDFs, or `0` to disable the cap. Local files and stdin are unaffected.
 - `--output-dir <dir>` writes extracted fallback images as `page-N.png`.
 - `--inline auto|kitty|iterm|none` renders extracted or rendered PNGs inline in supported terminals. It is not supported with `--json`.
 
@@ -78,4 +79,4 @@ instead of writing binary PNG bytes to stdout.
 - `2`: invalid usage or flags.
 - `3`: input could not be read or parsed as a PDF.
 - `4`: password is missing or incorrect.
-- `5`: render or extraction budget exceeded.
+- `5`: render, extraction, or HTTP fetch budget exceeded.

@@ -8,6 +8,7 @@ import {
   type ExtractOptions,
   type ExtractResult,
   type InlineImageMode,
+  type OpenPdfOptions,
   type RenderOptions,
   PdfBudgetError,
   PdfError,
@@ -36,6 +37,7 @@ type ParsedArgs = {
   version: boolean;
   password?: string;
   passwordFile?: string;
+  fetchMaxBytes?: number;
   mode?: ExtractMode;
   pages?: number[];
   page?: number;
@@ -85,6 +87,7 @@ Global flags:
   -v, --verbose              Print verbose diagnostics to stderr
   --no-color                 Disable color output
   --no-input                 Never prompt for input
+  --fetch-max-bytes <n>      HTTP(S) body limit in bytes (default: 100000000; 0 disables)
 
 Extraction flags:
   --password <value>         PDF password
@@ -193,6 +196,14 @@ function parseArgs(argv: string[]): ParsedArgs {
       case "--password-file":
         parsed.passwordFile = nextValue(args, ++index, arg);
         break;
+      case "--fetch-max-bytes": {
+        const value = Number(nextValue(args, ++index, arg));
+        if (!Number.isSafeInteger(value) || value < 0) {
+          throw new CliError("fetch-max-bytes must be a non-negative safe integer", 2);
+        }
+        parsed.fetchMaxBytes = value;
+        break;
+      }
       case "--mode":
         parsed.mode = parseMode(nextValue(args, ++index, arg));
         break;
@@ -388,6 +399,7 @@ async function readPassword(parsed: ParsedArgs): Promise<string | undefined> {
 async function runExtract(input: string | Uint8Array, parsed: ParsedArgs, password: string | undefined): Promise<void> {
   const options: ExtractOptions = { mode: parsed.mode ?? "text" };
   if (password !== undefined) options.password = password;
+  if (parsed.fetchMaxBytes !== undefined) options.fetchMaxBytes = parsed.fetchMaxBytes;
   if (parsed.pages !== undefined) options.pages = parsed.pages;
   if (parsed.maxPages !== undefined) options.maxPages = parsed.maxPages;
   if (parsed.maxTextChars !== undefined) options.maxTextChars = parsed.maxTextChars;
@@ -458,10 +470,11 @@ function jsonResult(result: ExtractResult): object {
 }
 
 async function runRender(input: string | Uint8Array, parsed: ParsedArgs, password: string | undefined): Promise<void> {
-  const openOptions: { password?: string } = {};
+  const openOptions: OpenPdfOptions = {};
   if (password !== undefined) {
     openOptions.password = password;
   }
+  if (parsed.fetchMaxBytes !== undefined) openOptions.fetchMaxBytes = parsed.fetchMaxBytes;
   if (parsed.maxDimension !== undefined) {
     throw new CliError("--max-dimension is only supported for extraction image fallback", 2);
   }

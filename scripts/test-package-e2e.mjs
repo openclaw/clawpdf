@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
+import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -45,7 +46,7 @@ try {
       "}",
       "",
       "export function loadRemote(url: URL, signal: AbortSignal) {",
-      "  return openPdf(url, { fetchTimeoutMs: 10_000, signal });",
+      "  return openPdf(url, { fetchTimeoutMs: 10_000, fetchMaxBytes: 10_000_000, signal });",
       "}",
       "",
     ].join("\n"),
@@ -84,6 +85,8 @@ try {
   assert(text.includes("CLI package smoke"), "text extraction output did not include PDF text");
   const renderHelp = runCli(cli, ["render", "--help"], { encoding: "utf8" });
   assert(renderHelp.includes("clawpdf render"), "render help did not print command help");
+  assert(renderHelp.includes("--fetch-max-bytes"), "help did not document the HTTP body budget");
+  await testRemoteInputs(installedPackage, cli);
   assertFails(
     () => runCli(cli, [pdfPath, "--json", "--inline", "auto"], { encoding: "utf8", stdio: "pipe" }),
     2,
@@ -184,6 +187,93 @@ async function testRemoteFailureCleanup(installedPackage, cli) {
   } finally {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+async function testRemoteInputs(installedPackage, cli) {
+  const { openPdf, extractPdf, releaseExtractEngine, PdfBudgetError } = await import(
+    pathToFileURL(join(installedPackage, "dist", "index.js")).href
+  );
+  const bytes = makeTextPdf("Remote package smoke");
+  const closed = new Set();
+  const server = createServer((request, response) => {
+    response.on("close", () => closed.add(request.url));
+    if (request.url === "/declared" || request.url === "/declared-unsafe") {
+      response.writeHead(200, { "Content-Length": request.url === "/declared" ? "100000001" : "9007199254740992" });
+      response.flushHeaders();
+    } else if (request.url === "/chunked") {
+      response.write(bytes);
+    } else if (request.url === "/error") {
+      response.writeHead(503);
+      response.flushHeaders();
+    } else {
+      response.writeHead(200, { "Content-Length": bytes.length });
+      response.end(bytes);
+    }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const run = async (args) => {
+    try {
+      const result = await promisify(execFile)(process.execPath, [cli, ...args], { encoding: "buffer", timeout: 10_000 });
+      return { ...result, code: 0 };
+    } catch (error) {
+      if (typeof error.code !== "number") throw error;
+      return error;
+    }
+  };
+  try {
+    for (const command of [[], ["extract"], ["render", "--page", "1"]]) {
+      const capped = await run([...command, `${url}/ok`, "--fetch-max-bytes", "32"]);
+      assert(capped.code === 5 && capped.stderr.includes("fetch budget"), "CLI did not enforce HTTP budget");
+      for (const budget of [String(bytes.length), "0"]) {
+        const result = await run([...command, `${url}/ok`, "--fetch-max-bytes", budget]);
+        assert(result.code === 0, "CLI did not forward the HTTP budget override");
+        assert(command[0] === "render"
+          ? result.stdout.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+          : result.stdout.includes("Remote package smoke"), "remote CLI output was invalid");
+      }
+      for (const invalid of ["-1", "1.5", "Infinity", "9007199254740992", "nope"]) {
+        const result = await run([...command, `${url}/ok`, "--fetch-max-bytes", invalid]);
+        assert(result.code === 2, "invalid HTTP budget did not return usage error");
+      }
+      const defaultCap = await run([...command, `${url}/declared`]);
+      assert(defaultCap.code === 5, "CLI did not enforce the default HTTP budget");
+    }
+    for (const path of ["/declared", "/declared-unsafe", "/chunked"]) {
+      closed.delete(path);
+      try {
+        const pdf = await openPdf(`${url}${path}`, { fetchMaxBytes: 32 });
+        pdf.destroy();
+        throw new Error("oversize HTTP body was accepted");
+      } catch (error) {
+        assert(error instanceof PdfBudgetError, "oversize HTTP body lost its typed budget error");
+      }
+      await waitForClose(path);
+    }
+    const result = await extractPdf(`${url}/ok`, { fetchMaxBytes: bytes.length });
+    assert(result.text.includes("Remote package smoke"), "packaged library HTTP extraction failed");
+    try {
+      const pdf = await openPdf(`${url}/error`);
+      pdf.destroy();
+      throw new Error("HTTP error was accepted");
+    } catch (error) {
+      assert(error.message.includes("503"), "HTTP status error was lost");
+    }
+    await waitForClose("/error");
+    console.log("Remote package proof: CLI extract/render limits, overrides, PNG/text output, library reads, and rejected-body cleanup passed");
+  } finally {
+    await releaseExtractEngine();
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+
+  async function waitForClose(path) {
+    const deadline = Date.now() + 2_000;
+    while (!closed.has(path) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert(closed.has(path), `rejected response ${path} kept downloading`);
   }
 }
 

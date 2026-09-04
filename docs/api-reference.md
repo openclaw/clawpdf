@@ -47,6 +47,10 @@ Remote URL options accepted by `openPdf`, `engine.open`, `extractPdf`, and
 
 - `fetchTimeoutMs?: number`: total HTTP(S) response deadline, default `30000`;
   use `0` to disable it.
+- `fetchMaxBytes?: number`: HTTP(S) response-body budget, default `100000000`;
+  use `0` to disable it. Oversize `Content-Length` values are rejected before
+  the body is read; streamed bodies that exceed the budget throw
+  `PdfBudgetError`.
 - `signal?: AbortSignal`: caller-controlled cancellation.
 
 ## `createEngine(options?)`
@@ -84,6 +88,7 @@ Options:
 
 - `password?: string`
 - `fetchTimeoutMs?: number`
+- `fetchMaxBytes?: number`
 - `signal?: AbortSignal`
 
 ## `PdfDocument`
@@ -119,6 +124,7 @@ Options:
 - `mode?: "auto" | "text" | "images" | "both"`
 - `password?: string`
 - `fetchTimeoutMs?: number`
+- `fetchMaxBytes?: number`
 - `signal?: AbortSignal`
 - `pages?: number[]`
 - `maxPages?: number`, applied to explicit `pages` only when provided
@@ -189,5 +195,5 @@ Every public API failure throws a `PdfError` subclass. Use
 - `PdfFormatError`: invalid input, missing path, fetch failure, or malformed PDF.
 - `PdfSecurityError`: unsupported PDF security handler.
 - `PdfPageRangeError`: requested page is outside the document.
-- `PdfBudgetError`: render or extraction budget exceeded.
+- `PdfBudgetError`: render, extraction, or HTTP fetch budget exceeded.
 - `PdfDestroyedError`: API used after destroy.

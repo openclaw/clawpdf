@@ -1,10 +1,11 @@
-import { PdfFormatError } from "./errors.js";
+import { PdfBudgetError, PdfError, PdfFormatError } from "./errors.js";
 
 export type PdfInput = Uint8Array | ArrayBuffer | string | URL | Blob;
 
 export type PdfInputOptions = {
   signal?: AbortSignal;
   fetchTimeoutMs?: number;
+  fetchMaxBytes?: number;
 };
 
 export async function normalizePdfInput(input: PdfInput, options: PdfInputOptions = {}): Promise<Uint8Array> {
@@ -41,6 +42,7 @@ async function readStringInput(input: string, options: PdfInputOptions): Promise
 }
 
 const defaultFetchTimeoutMs = 30_000;
+const defaultFetchMaxBytes = 100_000_000;
 const maxTimerMs = 2_147_483_647;
 
 async function readUrl(url: URL, options: PdfInputOptions): Promise<Uint8Array> {
@@ -52,6 +54,7 @@ async function readUrl(url: URL, options: PdfInputOptions): Promise<Uint8Array> 
     throw new PdfFormatError(`Unsupported PDF URL protocol: ${url.protocol}`);
   }
   const timeoutMs = resolveFetchTimeout(options.fetchTimeoutMs);
+  const maxBytes = resolveFetchMaxBytes(options.fetchMaxBytes);
   const controller = new AbortController();
   let timedOut = false;
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -76,11 +79,11 @@ async function readUrl(url: URL, options: PdfInputOptions): Promise<Uint8Array> 
     if (!response.ok) {
       throw new PdfFormatError(`Failed to fetch PDF from ${url.href}: ${response.status} ${response.statusText}`);
     }
-    return new Uint8Array(await response.arrayBuffer());
+    return await readResponseBytes(url, response, maxBytes);
   } catch (error) {
     // Stop unread error responses as well as failed body reads.
     controller.abort();
-    if (error instanceof PdfFormatError) {
+    if (error instanceof PdfError) {
       throw error;
     }
     if (timedOut) {
@@ -109,6 +112,86 @@ function resolveFetchTimeout(value: number | undefined): number {
     throw new PdfFormatError(`fetchTimeoutMs must be an integer between 0 and ${maxTimerMs}`);
   }
   return value;
+}
+
+function resolveFetchMaxBytes(value: number | undefined): number {
+  if (value === undefined) {
+    return defaultFetchMaxBytes;
+  }
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new PdfFormatError(`fetchMaxBytes must be an integer between 0 and ${Number.MAX_SAFE_INTEGER}`);
+  }
+  return value;
+}
+
+async function readResponseBytes(url: URL, response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return new Uint8Array(await response.arrayBuffer());
+  }
+  const declared = parseContentLength(response.headers.get("content-length"));
+  if (maxBytes > 0 && declared !== undefined && declared > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new PdfBudgetError(
+      "fetchMaxBytes",
+      declared,
+      `PDF response from ${url.href} exceeds the ${maxBytes}-byte fetch budget`,
+    );
+  }
+  if (maxBytes === 0) {
+    return new Uint8Array(await response.arrayBuffer());
+  }
+  return readCappedBody(url, response, maxBytes);
+}
+
+async function readCappedBody(url: URL, response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (!response.body) {
+    return new Uint8Array();
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new PdfBudgetError(
+          "fetchMaxBytes",
+          received,
+          `PDF response from ${url.href} exceeds the ${maxBytes}-byte fetch budget`,
+        );
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return concatUint8(chunks, received);
+}
+
+function parseContentLength(header: string | null): number | undefined {
+  if (header === null || header === "") {
+    return undefined;
+  }
+  if (!/^\d+$/.test(header)) {
+    return undefined;
+  }
+  // Larger decimal values (including Infinity) exceed every supported budget.
+  return Number(header);
+}
+
+function concatUint8(chunks: Uint8Array[], total: number): Uint8Array {
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
 }
 
 function isSupportedUrlProtocol(protocol: string): boolean {

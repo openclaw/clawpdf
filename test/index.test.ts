@@ -91,6 +91,34 @@ describe("clawpdf 0.2 API", () => {
     });
   });
 
+  it("caps remote PDF response bodies before buffering them", async () => {
+    const bytes = makeTextPdf("Oversized input");
+    await withPdfServer(bytes, async (baseUrl) => {
+      await expect(rejectRemotePdf(`${baseUrl}/ok`, { fetchMaxBytes: 32 }))
+        .resolves.toBeInstanceOf(PdfBudgetError);
+      await expect(rejectRemotePdf(`${baseUrl}/oversize-length`, { fetchMaxBytes: 64 }))
+        .resolves.toMatchObject({ name: "PdfBudgetError", limit: "fetchMaxBytes" });
+      await expect(rejectRemotePdf(`${baseUrl}/chunked-oversize`, { fetchMaxBytes: 64 }))
+        .resolves.toBeInstanceOf(PdfBudgetError);
+      await expect(rejectRemotePdf(`${baseUrl}/declared-huge`))
+        .resolves.toBeInstanceOf(PdfBudgetError);
+      await expect(openPdf(`${baseUrl}/declared-unsafe`, { fetchTimeoutMs: 100 }))
+        .rejects.toBeInstanceOf(PdfBudgetError);
+      await expect(extractPdf(`${baseUrl}/ok`, { fetchMaxBytes: 32 }).then(
+        () => {
+          throw new Error("expected extractPdf to reject an oversize HTTP body");
+        },
+        (error: unknown) => error,
+      )).resolves.toBeInstanceOf(PdfBudgetError);
+      await expect(openPdf(`${baseUrl}/ok`, { fetchMaxBytes: -1 }))
+        .rejects.toThrow("fetchMaxBytes must be an integer");
+
+      await using pdf = await openPdf(`${baseUrl}/ok`, { fetchMaxBytes: bytes.byteLength });
+      expect(pdf.text()).toContain("Oversized input");
+      await releaseExtractEngine();
+    });
+  });
+
   it("supports caller cancellation and validates remote fetch timeouts", async () => {
     const bytes = makeTextPdf("Abort input");
     await withPdfServer(bytes, async (baseUrl) => {
@@ -402,6 +430,16 @@ function readPngDimensions(bytes: Uint8Array): { width: number; height: number }
   return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
+async function rejectRemotePdf(url: string, options: { fetchMaxBytes?: number } = {}): Promise<unknown> {
+  try {
+    const pdf = await openPdf(url, options);
+    pdf.destroy();
+    throw new Error("expected openPdf to reject an oversize HTTP body");
+  } catch (error) {
+    return error;
+  }
+}
+
 async function withPdfServer(bytes: Uint8Array, run: (baseUrl: string) => Promise<void>): Promise<void> {
   const sockets = new Set<Socket>();
   const server = createServer((request, response) => {
@@ -413,6 +451,28 @@ async function withPdfServer(bytes: Uint8Array, run: (baseUrl: string) => Promis
     if (request.url === "/stall-body") {
       response.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": bytes.byteLength + 1 });
       response.write(bytes.subarray(0, 8));
+      return;
+    }
+    if (request.url === "/oversize-length") {
+      response.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": 200_000_000 });
+      response.end();
+      return;
+    }
+    if (request.url === "/declared-huge") {
+      response.writeHead(200, { "Content-Type": "application/pdf", "Content-Length": Number.MAX_SAFE_INTEGER });
+      response.end();
+      return;
+    }
+    if (request.url === "/declared-unsafe") {
+      response.writeHead(200, { "Content-Length": "9007199254740992" });
+      response.flushHeaders();
+      return;
+    }
+    if (request.url === "/chunked-oversize") {
+      response.writeHead(200, { "Content-Type": "application/pdf", "Transfer-Encoding": "chunked" });
+      response.write(bytes);
+      response.write(Buffer.alloc(128));
+      response.end();
       return;
     }
     if (request.url !== "/stall-headers") {
