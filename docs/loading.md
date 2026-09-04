@@ -52,6 +52,9 @@ await using pdf = await openPdf(url, {
 });
 ```
 
+Failed HTTP reads cancel the outstanding request and its unread response body
+before reporting the error.
+
 ## Lifetime
 
 `openPdf(...)` creates a private engine for the document. Destroying the
