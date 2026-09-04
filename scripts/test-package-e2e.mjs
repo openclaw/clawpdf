@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -120,6 +122,7 @@ try {
 
   const stdinText = runCli(cli, ["-"], { input: readFileSync(pdfPath), encoding: "utf8" });
   assert(stdinText.includes("CLI package smoke"), "stdin extraction failed");
+  await testRemoteFailureCleanup(installedPackage, cli);
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }
@@ -140,6 +143,47 @@ function findNpmCli() {
       throw new Error(`Could not find npm CLI next to ${process.execPath}`);
     }
     current = parent;
+  }
+}
+
+async function testRemoteFailureCleanup(installedPackage, cli) {
+  const { openPdf, PdfFormatError } = await import(pathToFileURL(join(installedPackage, "dist", "index.js")).href);
+  const { main } = await import(pathToFileURL(cli).href);
+  const closed = new Set();
+  const server = createServer((request, response) => {
+    response.on("close", () => closed.add(request.url));
+    response.writeHead(503, { "Content-Type": "application/pdf" });
+    response.write("unread error body");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const failures = [];
+  try {
+    for (const path of ["/library", "/cli-extract", "/cli-render"]) {
+      if (path === "/library") {
+        let failure;
+        try {
+          const pdf = await openPdf(`${base}${path}`);
+          pdf.destroy();
+        } catch (error) {
+          failure = error;
+        }
+        assert(failure instanceof PdfFormatError && failure.message.includes("503"), "HTTP error lost its format error/status");
+      } else {
+        const args = path === "/cli-render" ? ["render", "--page", "1"] : ["extract"];
+        assert(await main([...args, `${base}${path}`]) === 3, "CLI HTTP error lost its input-error exit code");
+      }
+      const deadline = Date.now() + 2_000;
+      while (!closed.has(path) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      console.log(`HTTP 503 ${path}: response ${closed.has(path) ? "closed" : "still open"}`);
+      if (!closed.has(path)) failures.push(path);
+    }
+    assert(failures.length === 0, `HTTP error responses kept downloading: ${failures.join(", ")}`);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
   }
 }
 

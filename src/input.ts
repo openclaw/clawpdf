@@ -78,6 +78,8 @@ async function readUrl(url: URL, options: PdfInputOptions): Promise<Uint8Array> 
     }
     return new Uint8Array(await response.arrayBuffer());
   } catch (error) {
+    // Stop unread error responses as well as failed body reads.
+    controller.abort();
     if (error instanceof PdfFormatError) {
       throw error;
     }

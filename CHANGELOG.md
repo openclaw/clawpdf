@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Cancelled unread HTTP error responses so failed library and CLI reads release their connections.
 - Hardened CI and developer tooling against excess token permissions, Windows shell interpolation, and docs-heading sanitizer bypasses.
 - Updated Node.js type definitions and the GitHub Pages action, including upstream deployment polling backoff.
 
