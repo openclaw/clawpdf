@@ -2,9 +2,11 @@
 
 ## Unreleased
 
+**Highlights:** Failed remote PDF reads now release their HTTP connections, with safer documentation and package tooling.
+
 - Cancelled unread HTTP error responses so failed library and CLI reads release their connections.
-- Hardened CI and developer tooling against excess token permissions, Windows shell interpolation, and docs-heading sanitizer bypasses.
-- Updated Node.js type definitions and the GitHub Pages action, including upstream deployment polling backoff.
+- Fixed docs-heading sanitization, removed Windows shell interpolation from package checks, and restricted CI token permissions. Thanks @vincentkoc.
+- Updated development dependencies, including Vitest 5, Node.js type definitions, and pnpm; refreshed CI and Pages actions, including deployment polling backoff.
 
 ## 0.3.1
 
