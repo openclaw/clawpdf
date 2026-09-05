@@ -95,6 +95,9 @@ export class EngineImpl implements PdfEngine {
     if (options.fetchTimeoutMs !== undefined) {
       openOptions.fetchTimeoutMs = options.fetchTimeoutMs;
     }
+    if (options.fetchMaxBytes !== undefined) {
+      openOptions.fetchMaxBytes = options.fetchMaxBytes;
+    }
     const document = await this.open(input, openOptions);
     try {
       return await extractDocument(document as DocumentImpl, options);

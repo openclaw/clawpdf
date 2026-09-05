@@ -51,11 +51,11 @@ export class PdfPageRangeError extends PdfError {
 }
 
 export class PdfBudgetError extends PdfError {
-  readonly limit: "maxPixels" | "maxDimension" | "maxTextChars" | "renderPixels";
+  readonly limit: "maxPixels" | "maxDimension" | "maxTextChars" | "renderPixels" | "fetchMaxBytes";
   readonly value: number;
 
   constructor(
-    limit: "maxPixels" | "maxDimension" | "maxTextChars" | "renderPixels",
+    limit: "maxPixels" | "maxDimension" | "maxTextChars" | "renderPixels" | "fetchMaxBytes",
     value: number,
     message = `${limit} budget exceeded: ${value}`,
   ) {

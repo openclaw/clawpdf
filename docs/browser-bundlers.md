@@ -38,9 +38,10 @@ Browser inputs:
 Path-like strings throw `PdfFormatError` in browsers because there is no file
 system path to read.
 
-Remote reads use the same 30-second default deadline as Node. Pass
-`fetchTimeoutMs` or `signal` to `openPdf` and `extractPdf` to customize or
-cancel a request without relying on `AbortSignal.timeout` support.
+HTTP(S) reads use the same 30-second default deadline and unlimited download
+size as Node. Pass a positive `fetchMaxBytes` to `openPdf` or `extractPdf` to opt
+into a body budget; `0` leaves it unlimited. Use `fetchTimeoutMs` or `signal` to
+customize or cancel a request without relying on `AbortSignal.timeout` support.
 
 ## Custom Instantiation
 

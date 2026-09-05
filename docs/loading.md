@@ -41,13 +41,19 @@ In browsers, string inputs must be URLs. Path-like strings throw
 `PdfFormatError`.
 
 HTTP and HTTPS reads have a 30-second deadline covering both response headers
-and the complete response body. Override it per call with `fetchTimeoutMs`, use
-`0` to disable the deadline, or pass an `AbortSignal` as `signal` for caller
-cancellation:
+and the complete response body. Override it with `fetchTimeoutMs`, use `0` to
+disable the deadline, or pass an `AbortSignal` as `signal` for caller cancellation.
+
+Downloads have no size cap by default (`fetchMaxBytes: 0`). Opt into an HTTP(S)
+response-body budget by setting `fetchMaxBytes` to a positive safe integer.
+Declared `Content-Length` values above the budget fail before the body is read;
+streamed bodies that exceed it also throw `PdfBudgetError`. Rejected downloads
+are cancelled. File, blob, and data URL inputs are unaffected by the size budget:
 
 ```ts
 await using pdf = await openPdf(url, {
   fetchTimeoutMs: 10_000,
+  fetchMaxBytes: 10_000_000,
   signal: controller.signal,
 });
 ```

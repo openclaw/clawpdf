@@ -53,6 +53,8 @@ The CLI reads file paths, URLs, and standard input. Text goes to stdout; diagnos
 | Emit structured output | `clawpdf report.pdf --json` |
 | Render one page | `clawpdf render report.pdf --page 1 -o page.png` |
 
+HTTP(S) downloads have no size cap by default. Opt into a byte budget with `--fetch-max-bytes 10000000` or the library's `fetchMaxBytes` option. `0` disables the budget; the existing 30-second deadline still applies.
+
 See the [CLI reference](docs/cli.md) for extraction modes, page selection, passwords, image budgets, inline terminal images, JSON output, and exit codes.
 
 ## Text-first extraction
