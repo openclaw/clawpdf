@@ -42,7 +42,7 @@ async function readStringInput(input: string, options: PdfInputOptions): Promise
 }
 
 const defaultFetchTimeoutMs = 30_000;
-const defaultFetchMaxBytes = 100_000_000;
+const defaultFetchMaxBytes = 0;
 const maxTimerMs = 2_147_483_647;
 
 async function readUrl(url: URL, options: PdfInputOptions): Promise<Uint8Array> {

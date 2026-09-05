@@ -47,10 +47,10 @@ Remote URL options accepted by `openPdf`, `engine.open`, `extractPdf`, and
 
 - `fetchTimeoutMs?: number`: total HTTP(S) response deadline, default `30000`;
   use `0` to disable it.
-- `fetchMaxBytes?: number`: HTTP(S) response-body budget, default `100000000`;
-  use `0` to disable it. Oversize `Content-Length` values are rejected before
-  the body is read; streamed bodies that exceed the budget throw
-  `PdfBudgetError`.
+- `fetchMaxBytes?: number`: opt-in HTTP(S) response-body budget, default `0`
+  (unlimited). A positive safe integer rejects oversize `Content-Length` values
+  before the body is read and counts streamed bytes. Exceeding the budget throws
+  `PdfBudgetError` and cancels the download.
 - `signal?: AbortSignal`: caller-controlled cancellation.
 
 ## `createEngine(options?)`

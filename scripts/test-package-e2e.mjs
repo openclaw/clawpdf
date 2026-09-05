@@ -195,6 +195,8 @@ async function testRemoteInputs(installedPackage, cli) {
     pathToFileURL(join(installedPackage, "dist", "index.js")).href
   );
   const bytes = makeTextPdf("Remote package smoke");
+  const largeBytes = makeTextPdf("Large remote package smoke", 100_000_000);
+  assert(largeBytes.length > 100_000_000, "large HTTP fixture must exceed 100 MB");
   const closed = new Set();
   const server = createServer((request, response) => {
     response.on("close", () => closed.add(request.url));
@@ -206,6 +208,9 @@ async function testRemoteInputs(installedPackage, cli) {
     } else if (request.url === "/error") {
       response.writeHead(503);
       response.flushHeaders();
+    } else if (request.url === "/large") {
+      response.writeHead(200, { "Content-Length": largeBytes.length });
+      response.end(largeBytes);
     } else {
       response.writeHead(200, { "Content-Length": bytes.length });
       response.end(bytes);
@@ -223,6 +228,23 @@ async function testRemoteInputs(installedPackage, cli) {
     }
   };
   try {
+    for (const options of [{}, { fetchMaxBytes: 0 }]) {
+      const pdf = await openPdf(`${url}/large`, options);
+      try {
+        assert(pdf.text().includes("Large remote package smoke"), "uncapped library read over 100 MB failed");
+      } finally {
+        pdf.destroy();
+      }
+    }
+    let budgetError;
+    try {
+      const pdf = await openPdf(`${url}/large`, { fetchMaxBytes: 100_000_000 });
+      pdf.destroy();
+    } catch (error) {
+      budgetError = error;
+    }
+    assert(budgetError instanceof PdfBudgetError && budgetError.limit === "fetchMaxBytes",
+      "explicit library budget did not reject a PDF over 100 MB");
     for (const command of [[], ["extract"], ["render", "--page", "1"]]) {
       const capped = await run([...command, `${url}/ok`, "--fetch-max-bytes", "32"]);
       assert(capped.code === 5 && capped.stderr.includes("fetch budget"), "CLI did not enforce HTTP budget");
@@ -237,8 +259,16 @@ async function testRemoteInputs(installedPackage, cli) {
         const result = await run([...command, `${url}/ok`, "--fetch-max-bytes", invalid]);
         assert(result.code === 2, "invalid HTTP budget did not return usage error");
       }
-      const defaultCap = await run([...command, `${url}/declared`]);
-      assert(defaultCap.code === 5, "CLI did not enforce the default HTTP budget");
+      const declaredCap = await run([...command, `${url}/declared`, "--fetch-max-bytes", "100000000"]);
+      assert(declaredCap.code === 5, "CLI did not reject an oversized declared length with an explicit budget");
+      const large = await run([...command, `${url}/large`]);
+      assert(large.code === 0, "CLI capped a PDF over 100 MB by default");
+      assert(command[0] === "render"
+        ? large.stdout.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+        : large.stdout.includes("Large remote package smoke"), "large remote CLI output was invalid");
+      const largeCapped = await run([...command, `${url}/large`, "--fetch-max-bytes", "100000000"]);
+      assert(largeCapped.code === 5 && largeCapped.stderr.includes("fetch budget"),
+        "explicit CLI budget did not reject a PDF over 100 MB");
     }
     for (const path of ["/declared", "/declared-unsafe", "/chunked"]) {
       closed.delete(path);
@@ -261,6 +291,7 @@ async function testRemoteInputs(installedPackage, cli) {
       assert(error.message.includes("503"), "HTTP status error was lost");
     }
     await waitForClose("/error");
+    console.log(`Large HTTP proof: ${largeBytes.length} bytes accepted by default and rejected with an explicit 100 MB budget in the library and CLI`);
     console.log("Remote package proof: CLI extract/render limits, overrides, PNG/text output, library reads, and rejected-body cleanup passed");
   } finally {
     await releaseExtractEngine();
@@ -303,7 +334,7 @@ function assertFails(run, exitCode, message) {
   throw new Error(message);
 }
 
-function makeTextPdf(text) {
+function makeTextPdf(text, paddingBytes = 0) {
   const escaped = text.replace(/[()\\]/g, (char) => `\\${char}`);
   const content = `BT /F1 24 Tf 72 720 Td (${escaped}) Tj ET`;
   const objects = [
@@ -313,6 +344,10 @@ function makeTextPdf(text) {
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>`,
     `<< /Length ${Buffer.byteLength(content, "utf8")} >>\nstream\n${content}\nendstream`,
   ];
+  if (paddingBytes > 0) {
+    // An unused stream enlarges the download without expensive page rendering.
+    objects.push(`<< /Length ${paddingBytes} >>\nstream\n${" ".repeat(paddingBytes)}\nendstream`);
+  }
   let body = "%PDF-1.4\n";
   const offsets = [0];
   for (let index = 0; index < objects.length; index += 1) {

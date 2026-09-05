@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-**Highlights:** Failed remote PDF reads now release their HTTP connections, with safer documentation and package tooling.
+**Highlights:** Remote PDF loading now combines reliable HTTP connection cleanup with opt-in download size budgets.
 
 - Cancelled unread HTTP error responses so failed library and CLI reads release their connections.
+- Added an opt-in HTTP(S) download size budget via `fetchMaxBytes` and `--fetch-max-bytes`; downloads remain unlimited by default. Thanks @SebTardif.
 - Fixed docs-heading sanitization, removed Windows shell interpolation from package checks, and restricted CI token permissions. Thanks @vincentkoc.
 - Updated development dependencies, including Vitest 5, Node.js type definitions, and pnpm; refreshed CI and Pages actions, including deployment polling backoff.
 

@@ -100,9 +100,9 @@ describe("clawpdf 0.2 API", () => {
         .resolves.toMatchObject({ name: "PdfBudgetError", limit: "fetchMaxBytes" });
       await expect(rejectRemotePdf(`${baseUrl}/chunked-oversize`, { fetchMaxBytes: 64 }))
         .resolves.toBeInstanceOf(PdfBudgetError);
-      await expect(rejectRemotePdf(`${baseUrl}/declared-huge`))
+      await expect(rejectRemotePdf(`${baseUrl}/declared-huge`, { fetchMaxBytes: 64 }))
         .resolves.toBeInstanceOf(PdfBudgetError);
-      await expect(openPdf(`${baseUrl}/declared-unsafe`, { fetchTimeoutMs: 100 }))
+      await expect(openPdf(`${baseUrl}/declared-unsafe`, { fetchTimeoutMs: 100, fetchMaxBytes: 64 }))
         .rejects.toBeInstanceOf(PdfBudgetError);
       await expect(extractPdf(`${baseUrl}/ok`, { fetchMaxBytes: 32 }).then(
         () => {

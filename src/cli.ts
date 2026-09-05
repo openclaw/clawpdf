@@ -87,7 +87,7 @@ Global flags:
   -v, --verbose              Print verbose diagnostics to stderr
   --no-color                 Disable color output
   --no-input                 Never prompt for input
-  --fetch-max-bytes <n>      HTTP(S) body limit in bytes (default: 100000000; 0 disables)
+  --fetch-max-bytes <n>      HTTP(S) body limit in bytes (default: 0, unlimited)
 
 Extraction flags:
   --password <value>         PDF password
