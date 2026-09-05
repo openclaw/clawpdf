@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.2 - 2026-09-05
 
 **Highlights:** Remote PDF loading now combines reliable HTTP connection cleanup with opt-in download size budgets.
