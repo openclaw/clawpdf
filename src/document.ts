@@ -349,18 +349,29 @@ function parsePdfDate(value: string | undefined): Date | undefined {
   if (!value) {
     return undefined;
   }
-  const match = value.match(/^D:?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
+  const match = value.match(/^(?:D:)?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:Z|([+-])(\d{2})(?:'?(\d{2}))?'?)?$/);
   if (!match) {
     return undefined;
   }
-  const [, year, month = "01", day = "01", hour = "00", minute = "00", second = "00"] = match;
-  const date = new Date(Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-  ));
-  return Number.isNaN(date.getTime()) ? undefined : date;
+  const [, year, month = "01", day = "01", hour = "00", minute = "00", second = "00",
+    offsetSign, offsetHour = "00", offsetMinute = "00"] = match;
+  const date = new Date(0);
+  // Date.UTC maps years 0–99 to 1900–1999; metadata years must stay literal.
+  date.setUTCFullYear(Number(year), Number(month) - 1, Number(day));
+  date.setUTCHours(Number(hour), Number(minute), Number(second), 0);
+  if (
+    date.getUTCFullYear() !== Number(year)
+    || date.getUTCMonth() !== Number(month) - 1
+    || date.getUTCDate() !== Number(day)
+    || date.getUTCHours() !== Number(hour)
+    || date.getUTCMinutes() !== Number(minute)
+    || date.getUTCSeconds() !== Number(second)
+    || Number(offsetHour) > 23
+    || Number(offsetMinute) > 59
+  ) {
+    return undefined;
+  }
+  const offset = (Number(offsetHour) * 60 + Number(offsetMinute)) * 60_000;
+  date.setTime(date.getTime() - (offsetSign === "-" ? -offset : offset));
+  return date;
 }

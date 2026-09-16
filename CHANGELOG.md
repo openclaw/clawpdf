@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed PDF metadata dates to honor timezone offsets, preserve years below 100, and omit invalid dates instead of silently rolling them over.
+
 ## 0.3.2 - 2026-09-05
 
 **Highlights:** Remote PDF loading now combines reliable HTTP connection cleanup with opt-in download size budgets.

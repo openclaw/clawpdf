@@ -70,6 +70,14 @@ document also destroys that private engine.
 closes still-open documents before destroying PDFium. Calling `destroy()` twice
 is safe. Calling other methods after destroy throws `PdfDestroyedError`.
 
+## Metadata
+
+`pdf.metadata.creationDate` and `pdf.metadata.modificationDate` are JavaScript
+`Date` values. PDF timezone offsets are applied to preserve the recorded instant.
+Dates without a timezone are interpreted as UTC. Missing month and day default
+to January and the first day; missing time fields default to zero. Invalid dates
+are omitted from the metadata instead of being rolled into another date.
+
 ## Passwords
 
 Pass a user password when opening:

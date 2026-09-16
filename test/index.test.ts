@@ -70,6 +70,48 @@ describe("clawpdf 0.2 API", () => {
     }
   });
 
+  it.each([
+    ["D:20260101003000+01'00'", "2025-12-31T23:30:00.000Z"],
+    ["D:20251231233000-02'30'", "2026-01-01T02:00:00.000Z"],
+    ["D:20260915120000+05'45'", "2026-09-15T06:15:00.000Z"],
+    ["D:20260915120000+0545", "2026-09-15T06:15:00.000Z"],
+    ["D:20260915120000+05'45", "2026-09-15T06:15:00.000Z"],
+    ["D:20260915120000-02", "2026-09-15T14:00:00.000Z"],
+    ["D:20260915120000-02'", "2026-09-15T14:00:00.000Z"],
+    ["D:20260915120000Z", "2026-09-15T12:00:00.000Z"],
+    ["20260915120000Z", "2026-09-15T12:00:00.000Z"],
+    ["D:20260915120000", "2026-09-15T12:00:00.000Z"],
+    ["D:2026", "2026-01-01T00:00:00.000Z"],
+    ["D:202609", "2026-09-01T00:00:00.000Z"],
+    ["D:20240229", "2024-02-29T00:00:00.000Z"],
+    ["D:00990101", "0099-01-01T00:00:00.000Z"],
+  ])("reads metadata date %s as %s", async (value, expected) => {
+    await using pdf = await openPdf(makeTextPdf("Metadata", { date: value }));
+    expect(pdf.metadata.creationDate?.toISOString()).toBe(expected);
+    expect(pdf.metadata.modificationDate?.toISOString()).toBe(expected);
+  });
+
+  it.each([
+    "D:20260229",
+    "D:20260431",
+    "D:20260001",
+    "D:20261301",
+    "D:20260100",
+    "D:20260101240000",
+    "D:20260101006000",
+    "D:20260101000060",
+    "D:20260101000000+24'00'",
+    "D:20260101000000-01'60'",
+    "D:20260101000000+01'2'",
+    "D:20260101000000Zgarbage",
+    "D:202601010000001",
+    "not a date",
+  ])("omits invalid metadata date %s", async (value) => {
+    await using pdf = await openPdf(makeTextPdf("Metadata", { date: value }));
+    expect(pdf.metadata).not.toHaveProperty("creationDate");
+    expect(pdf.metadata).not.toHaveProperty("modificationDate");
+  });
+
   it("bounds remote PDF reads across headers and response bodies", async () => {
     const bytes = makeTextPdf("Network input");
     await withPdfServer(bytes, async (baseUrl) => {
@@ -496,7 +538,7 @@ async function withPdfServer(bytes: Uint8Array, run: (baseUrl: string) => Promis
   }
 }
 
-function makeTextPdf(text: string | string[], options: { width?: number; height?: number; rotate?: 0 | 90 | 180 | 270 } = {}): Uint8Array {
+function makeTextPdf(text: string | string[], options: { width?: number; height?: number; rotate?: 0 | 90 | 180 | 270; date?: string } = {}): Uint8Array {
   const pages = Array.isArray(text) ? text : [text];
   const width = options.width ?? 612;
   const height = options.height ?? 792;
@@ -519,6 +561,10 @@ function makeTextPdf(text: string | string[], options: { width?: number; height?
     );
   }
   objects.splice(1, 0, `<< /Type /Pages /Kids [${pageObjects.map((object) => `${object} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+  if (options.date !== undefined) {
+    const date = options.date.replace(/[()\\]/g, (char) => `\\${char}`);
+    objects.push(`<< /CreationDate (${date}) /ModDate (${date}) >>`);
+  }
   let body = "%PDF-1.4\n";
   const offsets = [0];
   for (let i = 0; i < objects.length; i += 1) {
@@ -531,7 +577,8 @@ function makeTextPdf(text: string | string[], options: { width?: number; height?
   for (const offset of offsets.slice(1)) {
     body += `${String(offset).padStart(10, "0")} 00000 n \n`;
   }
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n`;
+  const info = options.date === undefined ? "" : ` /Info ${objects.length} 0 R`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${info} >>\n`;
   body += `startxref\n${xrefOffset}\n%%EOF\n`;
   return new TextEncoder().encode(body);
 }
