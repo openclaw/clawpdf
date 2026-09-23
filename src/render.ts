@@ -85,7 +85,6 @@ export function planImageRender(
   if (!Number.isFinite(maxScale) || maxScale <= 0) {
     return null;
   }
-  const capped = maxScale < requestedScale - 1e-9;
 
   let best: { scale: number; width: number; height: number } | null = null;
   let low = 0;
@@ -101,7 +100,11 @@ export function planImageRender(
       high = scale;
     }
   }
-  return best ? { ...best, capped } : null;
+  return best ? {
+    ...best,
+    capped: best.width < Math.ceil(pageWidth * requestedScale)
+      || best.height < Math.ceil(pageHeight * requestedScale),
+  } : null;
 }
 
 export function positiveInteger(name: string, value: number): number {
