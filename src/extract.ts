@@ -1,4 +1,4 @@
-import { type DocumentImpl, type PdfDocument, type TextOptions } from "./document.js";
+import { type DocumentImpl, type TextOptions } from "./document.js";
 import { type PdfEngine } from "./engine.js";
 import { type PdfInput, type PdfInputOptions } from "./input.js";
 import { PdfFormatError } from "./errors.js";
@@ -44,7 +44,6 @@ export type PdfImage = {
 
 export type ExtractPdf = (input: PdfInput, options?: ExtractOptions) => Promise<ExtractResult>;
 
-const defaultMaxPages = 20;
 const defaultMaxTextChars = 200_000;
 const defaultMinTextChars = 200;
 const defaultImageMaxPixels = 4_000_000;
@@ -55,7 +54,7 @@ export async function extractDocument(document: DocumentImpl, options: ExtractOp
   if (!["auto", "text", "images", "both"].includes(mode)) {
     throw new PdfFormatError(`Unsupported extraction mode: ${String(mode)}`);
   }
-  const pages = documentPages(document, options);
+  const pages = document.effectivePageNumbers(options);
   let text = "";
   let textPages: number[] = [];
   let textTruncated = false;
@@ -77,7 +76,7 @@ export async function extractDocument(document: DocumentImpl, options: ExtractOp
 
   const rendered = shouldRenderImages ? await renderImages(document, pages, options.image ?? {}) : { images: [], truncated: false };
   const imagePages = rendered.images.map((image) => image.page);
-  const pagesProcessed = uniqueNumbers([...textPages, ...imagePages]);
+  const pagesProcessed = [...new Set([...textPages, ...imagePages])];
   return {
     text,
     images: rendered.images,
@@ -137,23 +136,4 @@ async function renderImages(
     truncated = true;
   }
   return { images, truncated };
-}
-
-function documentPages(document: PdfDocument, options: Pick<ExtractOptions, "pages" | "maxPages">): number[] {
-  if (options.pages) {
-    const limit = options.maxPages === undefined
-      ? options.pages.length
-      : positiveInteger("maxPages", options.maxPages);
-    const selected = options.pages.slice(0, limit);
-    for (const page of selected) {
-      document.page(page);
-    }
-    return selected;
-  }
-  const maxPages = positiveInteger("maxPages", options.maxPages ?? defaultMaxPages);
-  return Array.from({ length: Math.min(document.pageCount, maxPages) }, (_, index) => index + 1);
-}
-
-function uniqueNumbers(values: number[]): number[] {
-  return [...new Set(values)];
 }

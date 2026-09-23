@@ -340,11 +340,6 @@ function assignIfPresent<K extends keyof PdfMetadata>(metadata: PdfMetadata, key
   }
 }
 
-function pageRotationToDegrees(rotation: number): 0 | 90 | 180 | 270 {
-  const normalized = ((rotation % 4) + 4) % 4;
-  return (normalized * 90) as 0 | 90 | 180 | 270;
-}
-
 function parsePdfDate(value: string | undefined): Date | undefined {
   if (!value) {
     return undefined;
