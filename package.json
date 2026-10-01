@@ -56,8 +56,7 @@
     "node": ">=22"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "packageManager": "pnpm@11.27.1"
 }
