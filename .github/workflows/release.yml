@@ -1,0 +1,190 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24
+
+jobs:
+  publish:
+    name: Publish clawpdf
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11.27.1
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate package metadata
+        run: |
+          node <<'NODE'
+          const { readFileSync } = require("node:fs");
+
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          const expectedName = "clawpdf";
+          const expectedAuthor = "OpenClaw Team <dev@openclaw.ai>";
+          const expectedRepo = "https://github.com/openclaw/clawpdf";
+          const repository = typeof pkg.repository === "string"
+            ? pkg.repository
+            : pkg.repository?.url;
+          const normalize = (value) =>
+            String(value ?? "")
+              .trim()
+              .replace(/^git\+/, "")
+              .replace(/\.git$/i, "")
+              .replace(/\/+$/, "");
+
+          const errors = [];
+          if (pkg.name !== expectedName) {
+            errors.push(`package name must be ${expectedName}; found ${pkg.name ?? "<missing>"}`);
+          }
+          if (pkg.author !== expectedAuthor) {
+            errors.push(`package author must be ${expectedAuthor}; found ${pkg.author ?? "<missing>"}`);
+          }
+          if (normalize(repository) !== expectedRepo) {
+            errors.push(`repository URL must be ${expectedRepo}; found ${normalize(repository) || "<missing>"}`);
+          }
+          if (pkg.private === true) {
+            errors.push("package must not be private");
+          }
+          if (pkg.publishConfig?.access !== "public") {
+            errors.push("publishConfig.access must be public");
+          }
+          if (pkg.publishConfig?.provenance !== true) {
+            errors.push("publishConfig.provenance must be true");
+          }
+          if (errors.length > 0) {
+            for (const error of errors) console.error(error);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+
+          node <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const { readFileSync } = require("node:fs");
+
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          const releaseTag = process.env.RELEASE_TAG ?? "";
+          const expectedTag = `v${pkg.version}`;
+
+          if (!/^v\d+\.\d+\.\d+$/.test(releaseTag)) {
+            throw new Error(`release tag must match vX.Y.Z; received ${releaseTag || "<missing>"}`);
+          }
+          if (releaseTag !== expectedTag) {
+            throw new Error(`release tag ${releaseTag} does not match package version ${pkg.version}`);
+          }
+
+          const releaseCommit = execFileSync("git", ["rev-list", "-n", "1", releaseTag], {
+            encoding: "utf8",
+          }).trim();
+          const checkedOutCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+            encoding: "utf8",
+          }).trim();
+          if (releaseCommit !== checkedOutCommit) {
+            throw new Error(`release tag resolves to ${releaseCommit}, but checkout is ${checkedOutCommit}`);
+          }
+          execFileSync("git", ["merge-base", "--is-ancestor", releaseCommit, "origin/main"]);
+          NODE
+
+      - name: Resolve npm publish state
+        id: npm-version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          release_commit="$(git rev-list -n 1 "${RELEASE_TAG}")"
+          set +e
+          output="$(npm view "${package_name}@${package_version}" gitHead --json 2>&1)"
+          status=$?
+          set -e
+          if [ "${status}" -eq 0 ]; then
+            published_commit="$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(typeof value === "string" ? value : "")' "${output}")"
+            if [ "${published_commit}" != "${release_commit}" ]; then
+              echo "${package_name}@${package_version} is already published from ${published_commit:-<unknown>}, not ${release_commit}." >&2
+              exit 1
+            fi
+            echo "${package_name}@${package_version} is already published from this release commit; treating this as a release rerun."
+            echo "published=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          if ! printf '%s\n' "${output}" | grep -q "E404"; then
+            printf '%s\n' "${output}" >&2
+            exit "${status}"
+          fi
+          echo "published=false" >> "${GITHUB_OUTPUT}"
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Test package
+        run: pnpm test:package
+
+      - name: Build documentation
+        run: pnpm docs:site
+
+      - name: Verify package
+        run: pnpm pack --dry-run
+
+      - name: Publish with npm trusted publishing
+        if: steps.npm-version.outputs.published != 'true'
+        run: npm publish --access public --provenance
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: publish
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release view "${RELEASE_TAG}" >/dev/null 2>&1 || gh release create "${RELEASE_TAG}" --verify-tag --title "${RELEASE_TAG}" --generate-notes
