@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 - 2026-10-01
 
 - Fixed image extraction to report truncation when rounded pixel dimensions force a smaller image to fit the budget.
 - Fixed PDF metadata dates to honor timezone offsets, preserve years below 100, and omit invalid dates instead of silently rolling them over.
