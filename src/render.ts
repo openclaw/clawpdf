@@ -102,9 +102,20 @@ export function planImageRender(
   }
   return best ? {
     ...best,
-    capped: best.width < Math.ceil(pageWidth * requestedScale)
-      || best.height < Math.ceil(pageHeight * requestedScale),
+    capped: best.width < requestedPixelSize(pageWidth, requestedScale)
+      || best.height < requestedPixelSize(pageHeight, requestedScale),
   } : null;
+}
+
+// 792 * (150 / 72) is 1650 in real math and 1650.0000000000002 in float.
+// Ceil of that exact page is one pixel too tall, so snap before comparing.
+function requestedPixelSize(pageSize: number, scale: number): number {
+  const raw = pageSize * scale;
+  const nearest = Math.round(raw);
+  if (Number.isFinite(raw) && Math.abs(raw - nearest) <= Number.EPSILON * Math.abs(raw) * 2) {
+    return Math.max(1, nearest);
+  }
+  return Math.max(1, Math.ceil(raw));
 }
 
 export function positiveInteger(name: string, value: number): number {

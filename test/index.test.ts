@@ -259,6 +259,21 @@ describe("clawpdf 0.2 API", () => {
     expect(result.truncated.images).toBe(truncated);
   });
 
+  it.each([
+    { maxPixels: 4_000_000, width: 1275, height: 1650, truncated: false },
+    { maxPixels: 1_000_000, width: 879, height: 1137, truncated: true },
+  ])("reports Letter image truncation at 150 DPI with $maxPixels pixels", async ({ maxPixels, width, height, truncated }) => {
+    const result = await extractPdf(makeTextPdf("Letter"), {
+      mode: "images",
+      image: { dpi: 150, maxPixels },
+    });
+
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]).toMatchObject({ width, height });
+    expect(readPngDimensions(result.images[0]!.bytes)).toEqual({ width, height });
+    expect(result.truncated.images).toBe(truncated);
+  });
+
   it("supports extraction modes", async () => {
     const pdf = makeTextPdf("Short", { width: 100, height: 100 });
     const textOnly = await extractPdf(pdf, { mode: "text", minTextChars: 1000 });

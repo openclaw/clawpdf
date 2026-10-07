@@ -73,7 +73,9 @@ type ExtractResult = {
 
 `truncated.images` is true when any selected page is omitted or its rendered
 pixel dimensions are reduced to fit the image budget. Budget checks include
-rounding up to whole pixels.
+rounding up to whole pixels. Floating-point noise around an exact pixel size
+does not count as truncation: a Letter page at 150 DPI produces 1275 by 1650
+pixels without reporting a budget cut when that size fits.
 
 Image bytes are raw PNG data. Use `toMessageContent(result)` or
 `toDataUrls(result)` when a transport needs base64.

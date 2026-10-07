@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed false image truncation reports caused by floating-point rounding at exact pixel sizes, including Letter pages at 150 DPI. Thanks @SebTardif.
+
 ## 0.3.3 - 2026-10-01
 
 - Fixed image extraction to report truncation when rounded pixel dimensions force a smaller image to fit the budget.
