@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fixed false image truncation reports caused by floating-point rounding at exact pixel sizes, including Letter pages at 150 DPI. Thanks @SebTardif.
+- Updated development dependencies and pnpm within their current major versions, retaining the 48-hour release cooldown and Node.js 22 runtime minimum.
 
 ## 0.3.3 - 2026-10-01
 
