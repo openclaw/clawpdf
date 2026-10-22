@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-$nodeVersion = "24.15.0"
+$nodeVersion = "24.22.1"
 $tempRoot = [System.IO.Path]::GetTempPath()
 $nodeDir = Join-Path $tempRoot "clawpdf-node"
 $nodeRoot = Join-Path $nodeDir "node-v$nodeVersion-win-x64"
