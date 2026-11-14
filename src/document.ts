@@ -344,7 +344,7 @@ function parsePdfDate(value: string | undefined): Date | undefined {
   if (!value) {
     return undefined;
   }
-  const match = value.match(/^(?:D:)?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:Z|([+-])(\d{2})(?:'?(\d{2}))?'?)?$/);
+  const match = value.match(/^(?:D:)?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?(?:Z(?:00'00'?)?|([+-])(\d{2})(?:'?(\d{2}))?'?)?$/);
   if (!match) {
     return undefined;
   }
