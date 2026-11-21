@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Restore creation and modification timestamps for PDFs with `Z00'00'` or `Z00'00` UTC suffixes, including macOS Preview exports. Thanks @brianmcguire and @trackoor. (#33, #34)
+- Refresh compatible test tooling, align Node typings with the Node.js 22 runtime minimum, and add a validation-only release dry run.
+
 - Fixed false image truncation reports caused by floating-point rounding at exact pixel sizes, including Letter pages at 150 DPI. Thanks @SebTardif.
 - Updated development dependencies and pnpm within their current major versions, retaining the 48-hour release cooldown and Node.js 22 runtime minimum.
 

@@ -1,6 +1,12 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate the selected source without publishing
+        default: true
+        type: boolean
   push:
     tags:
       - "v*.*.*"
@@ -17,7 +23,8 @@ env:
 
 jobs:
   publish:
-    name: Publish clawpdf
+    name: Validate or publish clawpdf
+    if: ${{ github.event_name == 'push' || inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -87,6 +94,7 @@ jobs:
           NODE
 
       - name: Validate release tag
+        if: ${{ github.event_name == 'push' }}
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -121,6 +129,7 @@ jobs:
           NODE
 
       - name: Resolve npm publish state
+        if: ${{ github.event_name == 'push' }}
         id: npm-version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -168,10 +177,11 @@ jobs:
         run: pnpm pack --dry-run
 
       - name: Publish with npm trusted publishing
-        if: steps.npm-version.outputs.published != 'true'
+        if: ${{ github.event_name == 'push' && steps.npm-version.outputs.published != 'true' }}
         run: npm publish --access public --provenance
 
   release:
+    if: ${{ github.event_name == 'push' }}
     name: Publish GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
