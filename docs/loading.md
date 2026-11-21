@@ -74,7 +74,7 @@ is safe. Calling other methods after destroy throws `PdfDestroyedError`.
 
 `pdf.metadata.creationDate` and `pdf.metadata.modificationDate` are JavaScript
 `Date` values. PDF timezone offsets are applied to preserve the recorded instant.
-Dates without a timezone are interpreted as UTC. Missing month and day default
+Bare `Z` and the zero-offset UTC suffixes `Z00'00'` and `Z00'00` are accepted, including dates written by macOS Preview. Dates without a timezone are interpreted as UTC. Missing month and day default
 to January and the first day; missing time fields default to zero. Invalid dates
 are omitted from the metadata instead of being rolled into another date.
 

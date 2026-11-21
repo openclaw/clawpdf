@@ -119,6 +119,8 @@ pnpm docs:site
 
 CI runs the same checks on Node.js 22, 24, and 26.
 
+Maintainers can validate the current source through `gh workflow run release.yml --ref main -F dry_run=true`. This manual run builds, tests, and verifies the package without publishing to npm or GitHub.
+
 ## License
 
 MIT. PDFium carries upstream BSD-style and Apache-2.0 notices; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
